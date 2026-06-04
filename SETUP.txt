@@ -1,0 +1,53 @@
+QUICK SETUP GUIDE
+=================
+
+Step 1: Install Backend Dependencies
+-------------------------------------
+cd Backend
+npm install
+cd ..
+
+Step 2: Install Frontend Web Dependencies
+-----------------------------------------
+cd Frontend/Web
+npm install
+cd ../..
+
+Step 3: Install Frontend App Dependencies (Optional)
+----------------------------------------------------
+cd Frontend/App
+npm install
+cd ../..
+
+Step 4: Configure Environment Variables
+---------------------------------------
+- Copy Backend/.env.example to Backend/.env
+- Add your Supabase, Daily.co, FCM, Resend API keys
+
+Step 5: Run the Application
+---------------------------
+FROM ROOT (FYP folder):
+
+For Web Application:
+npm run dev
+
+For Mobile Application:
+npm run web
+
+For Analytics Service:
+npm run dev:analytics
+
+
+TROUBLESHOOTING
+===============
+
+If you get "nodemon not found":
+- Make sure you ran: cd Backend && npm install
+
+If backend fails to start:
+- Check Backend/.env file exists with correct keys
+- Make sure port 5000 is not in use
+
+If frontend fails to start:
+- Make sure you're in the FYP root folder
+- Run: cd Frontend/Web && npm install

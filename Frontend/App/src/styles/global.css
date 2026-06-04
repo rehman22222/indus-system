@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Safe area insets for mobile app */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Indus Hospital Brand Design System
+   Primary: Alizarin Crimson #E9242B
+   White: #FFFFFF
+   Accent: #F5BEC3 (soft pink)
+   All colors in HSL format
+*/
+
+@layer base {
+  :root {
+    /* Clean, minimal backgrounds - less red */
+    --background: 0 0% 99%;
+    --foreground: 0 0% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+
+    /* Alizarin Crimson #E9242B -> HSL(357, 82%, 53%) - used sparingly */
+    --primary: 357 82% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Softer secondary - very light gray with slight warmth */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 25%;
+
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 40%;
+
+    /* Very subtle accent - barely pink */
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 25%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 357 82% 53%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - keep brand color but cleaner */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 357 82% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 0 0% 92%;
+    --sidebar-ring: 357 82% 53%;
+
+    /* Chart colors - more muted */
+    --chart-1: 357 70% 50%;
+    --chart-2: 220 60% 55%;
+    --chart-3: 160 55% 45%;
+    --chart-4: 45 80% 55%;
+    --chart-5: 280 55% 55%;
+
+    --transition-smooth: all 0.2s ease;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Smooth animations for healthcare apps - based on 2026 best practices */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-pulse-subtle {
+    animation: pulseSubtle 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulseSubtle {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  /* Smooth transitions for interactive elements */
+  .transition-smooth {
+    transition: all 0.2s ease;
+  }
+
+  .transition-colors-smooth {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  /* Healthcare-specific utilities */
+  .status-indicator {
+    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .status-waiting {
+    @apply bg-chart-4/10 text-chart-4;
+  }
+
+  .status-in-progress {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .status-completed {
+    @apply bg-chart-3/10 text-chart-3;
+  }
+
+  .status-scheduled {
+    @apply bg-chart-2/10 text-chart-2;
+  }
+
+  /* Card hover effects */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* Focus states for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+}

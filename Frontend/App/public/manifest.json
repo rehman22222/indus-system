@@ -1,0 +1,24 @@
+{
+    "name": "INDUS Hospital - Smart Appointment System",
+    "short_name": "INDUS Hospital",
+    "description": "Book appointments, manage prescriptions, and access healthcare services",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#E9242B",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "health",
+        "medical",
+        "lifestyle"
+    ],
+    "screenshots": []
+}

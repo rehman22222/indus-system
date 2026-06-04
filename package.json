@@ -1,0 +1,38 @@
+{
+    "name": "hospital-management-fyp",
+    "version": "1.0.0",
+    "description": "Hospital Management System - Final Year Project",
+    "private": true,
+    "scripts": {
+        "dev": "concurrently --names \"BACKEND,WEB\" --prefix-colors \"blue,green\" \"npm run dev:backend\" \"npm run dev:web\"",
+        "web": "concurrently --names \"BACKEND,APP\" --prefix-colors \"blue,magenta\" \"npm run dev:backend\" \"npm run dev:app\"",
+        "app": "npm run dev:app",
+        "dev:backend": "cd Backend && node src/server.js",
+        "dev:backend:watch": "cd Backend && nodemon src/server.js",
+        "dev:web": "cd Frontend/Web && npm run dev",
+        "dev:app": "cd Frontend/App && npm run web",
+        "dev:analytics": "cd Backend/Analytics && python -m uvicorn api.main:app --reload",
+        "build:backend": "cd Backend && echo 'No build needed for Node.js'",
+        "build:web": "cd Frontend/Web && npm run build",
+        "build:app": "cd Frontend/App && npm run build",
+        "test:backend": "cd Backend && npm test",
+        "test:analytics": "cd Backend/Analytics && pytest",
+        "test:web": "cd Frontend/Web && npm test",
+        "test:app": "cd Frontend/App && npm test",
+        "install:backend": "cd Backend && npm install",
+        "install:web": "cd Frontend/Web && npm install",
+        "install:app": "cd Frontend/App && npm install",
+        "install:all": "npm install && npm run install:backend && npm run install:web && npm run install:app"
+    },
+    "keywords": [
+        "hospital",
+        "management",
+        "healthcare",
+        "fyp"
+    ],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
