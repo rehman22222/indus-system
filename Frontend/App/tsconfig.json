@@ -16,10 +16,11 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@acme/core-api": ["./src/services/core-api.ts"]
     }
   },
-  "include": ["src"],
+  "include": ["src/App.tsx", "src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"],
   "ts-node": {
     "compilerOptions": {

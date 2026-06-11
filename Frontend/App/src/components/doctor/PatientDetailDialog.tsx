@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import {
   User, PlayCircle, CheckCircle2, Pill, Plus, Trash2, Loader2, FileText,
   Phone, Mail, MapPin, Heart, AlertTriangle, Activity, Droplets, Shield,
@@ -69,7 +69,7 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
       const updates: Record<string, unknown> = { status: newStatus };
       if (newStatus === 'in_consultation') updates.consultation_start_time = new Date().toISOString();
       if (newStatus === 'completed') updates.consultation_end_time = new Date().toISOString();
-      const { error } = await supabase.from('appointments').update(updates as any).eq('id', appointment.id);
+      const { error } = await MongoDB.from('appointments').update(updates as any).eq('id', appointment.id);
       if (error) throw error;
       toast({ title: 'Status Updated', description: `Patient marked as ${newStatus.replace('_', ' ')}` });
       onStatusUpdate();
@@ -84,7 +84,7 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
     if (!consultationNotes.trim()) return;
     setSavingNotes(true);
     try {
-      const { error } = await supabase.from('appointments').update({
+      const { error } = await MongoDB.from('appointments').update({
         notes: consultationNotes,
       } as any).eq('id', appointment.id);
       if (error) throw error;
@@ -110,7 +110,7 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
     if (medications.some(m => !m.name || !m.dosage)) { toast({ title: 'Error', description: 'Please fill medication name and dosage', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from('prescriptions').insert({
+      const { error } = await MongoDB.from('prescriptions').insert({
         appointment_id: appointment.id, patient_id: appointment.patient_id, doctor_id: doctorId,
         diagnosis, medications: medications as any, instructions: instructions || null, follow_up_date: followUpDate || null,
       });
@@ -132,7 +132,7 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
     if (pastLoaded || !appointment.patient_id) return;
     setLoadingPast(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('appointments')
         .select(`
           id, appointment_date, appointment_time, status, chief_complaint, notes,

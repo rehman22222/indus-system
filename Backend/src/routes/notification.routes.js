@@ -3,9 +3,45 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
-import { sendNotification, sendBulkNotification } from '../controllers/notification.controller.js';
+import {
+    createNotification,
+    listNotifications,
+    registerDeviceToken,
+    sendNotification,
+    sendBulkNotification,
+    updateNotification,
+} from '../controllers/notification.controller.js';
 
 const router = express.Router();
+
+router.get('/', authMiddleware, asyncHandler(listNotifications));
+router.post(
+    '/',
+    authMiddleware,
+    requireRole(['admin', 'doctor', 'management']),
+    asyncHandler(createNotification),
+);
+router.patch('/:id', authMiddleware, asyncHandler(updateNotification));
+
+router.post(
+    '/register-device',
+    authMiddleware,
+    [
+        body('token')
+            .notEmpty()
+            .withMessage('Device token is required'),
+        body('provider')
+            .optional()
+            .isIn(['fcm', 'apns', 'expo', 'unknown'])
+            .withMessage('Provider must be fcm, apns, expo, or unknown'),
+        body('platform')
+            .optional()
+            .isIn(['android', 'ios', 'web', 'unknown'])
+            .withMessage('Platform must be android, ios, web, or unknown'),
+        validate,
+    ],
+    asyncHandler(registerDeviceToken),
+);
 
 /**
  * POST /api/v1/notifications/send
@@ -16,9 +52,10 @@ router.post(
     authMiddleware,
     requireRole(['admin', 'doctor', 'management']),
     [
-        body('userId')
-            .notEmpty()
-            .withMessage('User ID is required'),
+        body().custom((_, { req }) => {
+            if (!req.body.userId && !req.body.user_id) throw new Error('User ID is required');
+            return true;
+        }),
         body('title')
             .notEmpty()
             .withMessage('Title is required'),
@@ -43,9 +80,13 @@ router.post(
     authMiddleware,
     requireRole(['admin', 'management']),
     [
-        body('userIds')
-            .isArray({ min: 1 })
-            .withMessage('User IDs array is required'),
+        body().custom((_, { req }) => {
+            const ids = req.body.userIds || req.body.user_ids;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                throw new Error('User IDs array is required');
+            }
+            return true;
+        }),
         body('title')
             .notEmpty()
             .withMessage('Title is required'),

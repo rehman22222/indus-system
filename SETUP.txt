@@ -22,11 +22,18 @@ cd ../..
 Step 4: Configure Environment Variables
 ---------------------------------------
 - Copy Backend/.env.example to Backend/.env
-- Add your Supabase, Daily.co, FCM, Resend API keys
+- Add your MongoDB Atlas URI, Daily.co, FCM, Resend API keys
+- Never put MongoDB credentials in frontend .env files
 
 Step 5: Run the Application
 ---------------------------
 FROM ROOT (FYP folder):
+
+Seed Demo Database:
+cd Backend
+npm run db:ensure-indexes
+npm run db:seed
+cd ..
 
 For Web Application:
 npm run dev
@@ -46,6 +53,7 @@ If you get "nodemon not found":
 
 If backend fails to start:
 - Check Backend/.env file exists with correct keys
+- Check MongoDB Atlas Network Access allows your current IP
 - Make sure port 5000 is not in use
 
 If frontend fails to start:

@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDoctors, useDoctorByEmail } from '@/hooks/useDoctors';
 import { useDoctorAppointments, useUpdateAppointment } from '@/hooks/useAppointments';
 import { useDoctorPrescriptions } from '@/hooks/usePrescriptions';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
@@ -11,7 +11,8 @@ import { format } from 'date-fns';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { DoctorAuthScreen } from '@/components/doctor/DoctorAuthScreen';
 import { DoctorHome } from '@/components/doctor/DoctorHome';
-import { VideoConsultation } from '@/components/patient/VideoConsultation';
+import { VideoCall } from '@/components/shared/VideoCall';
+import { getOrCreateVideoRoom } from '@/lib/videoRoom';
 import { sendCallInvite } from '@/lib/callInvite';
 import { DoctorSchedule } from '@/components/doctor/DoctorSchedule';
 import { DoctorPrescriptions } from '@/components/doctor/DoctorPrescriptions';
@@ -54,7 +55,7 @@ export default function DoctorApp() {
       const fallbackName =
         md.full_name?.trim() ||
         user.email!.split('@')[0].replace(/\d+$/, '').replace(/^./, (c) => c.toUpperCase());
-      await supabase.from('doctors').insert({
+      await MongoDB.from('doctors').insert({
         full_name: fallbackName,
         email: user.email,
         specialty: 'General Medicine',
@@ -76,6 +77,8 @@ export default function DoctorApp() {
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [consentDialog, setConsentDialog] = useState<Appointment | null>(null);
   const [videoApt, setVideoApt] = useState<Appointment | null>(null);
+  const [videoRoomUrl, setVideoRoomUrl] = useState<string | null>(null);
+  const [videoProvider, setVideoProvider] = useState<string>('jitsi');
 
   const handleRealLogin = async (email: string, password: string) => {
     const { error } = await signIn(email, password);
@@ -88,11 +91,21 @@ export default function DoctorApp() {
     toast({ title: 'Logged Out' });
   };
 
-  // Open the call UI and ring the patient (best-effort invite).
+  // Create/join the video room, open the call, and ring the patient.
   const handleJoinVideo = async (apt: Appointment) => {
-    setVideoApt(apt);
     try {
-      const { data } = await supabase
+      const room = await getOrCreateVideoRoom(apt.id);
+      setVideoApt(apt);
+      setVideoRoomUrl(room.url);
+      setVideoProvider(room.provider || 'jitsi');
+    } catch (err: any) {
+      toast({ title: 'Could not start video', description: err.message, variant: 'destructive' });
+      return;
+    }
+
+    // Ring the patient (best-effort — they can also Join from their appointments).
+    try {
+      const { data } = await MongoDB
         .from('patients')
         .select('user_id')
         .eq('id', apt.patient_id)
@@ -106,7 +119,7 @@ export default function DoctorApp() {
         });
       }
     } catch {
-      /* invite is best-effort; the patient can still Join from their appointments */
+      /* invite is best-effort */
     }
   };
 
@@ -125,7 +138,7 @@ export default function DoctorApp() {
     });
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else {
-      await supabase.from('encounters').insert({
+      await MongoDB.from('encounters').insert({
         appointment_id: apt.id,
         doctor_id: apt.doctor_id,
         patient_id: apt.patient_id,
@@ -139,7 +152,7 @@ export default function DoctorApp() {
 
   const handleRecordConsent = async () => {
     if (!consentDialog) return;
-    await supabase.from('appointments').update({
+    await MongoDB.from('appointments').update({
       consent_recorded: true,
       consent_recorded_at: new Date().toISOString(),
     }).eq('id', consentDialog.id);
@@ -154,7 +167,7 @@ export default function DoctorApp() {
     });
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else {
-      await supabase.from('encounters').update({
+      await MongoDB.from('encounters').update({
         ended_at: new Date().toISOString(),
       }).eq('appointment_id', apt.id);
       toast({ title: 'Consultation Completed' });
@@ -224,12 +237,12 @@ export default function DoctorApp() {
       )}
 
       {/* Video Consultation (full-screen overlay) */}
-      {videoApt && (
-        <VideoConsultation
-          appointmentId={videoApt.id}
-          role="doctor"
-          peerName={videoApt.patient?.name || 'Patient'}
-          onEnd={() => { setVideoApt(null); refetchAppointments(); }}
+      {videoApt && videoRoomUrl && (
+        <VideoCall
+          roomUrl={videoRoomUrl}
+          provider={videoProvider}
+          userName={activeDoctor?.name ? `Dr. ${activeDoctor.name}` : 'Doctor'}
+          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); refetchAppointments(); }}
         />
       )}
 
@@ -240,6 +253,7 @@ export default function DoctorApp() {
         onStatusUpdate={() => { refetchAppointments(); refetchPrescriptions(); }}
         doctorId={activeDoctor.id}
         prescriptions={prescriptions}
+        onStartVideo={(apt) => { setSelectedPatient(null); handleJoinVideo(apt); }}
       />
 
       {/* Prescription Detail Dialog */}

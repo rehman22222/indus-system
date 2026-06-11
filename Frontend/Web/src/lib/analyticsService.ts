@@ -21,10 +21,65 @@ export interface VolumeForecast {
 
 export interface PatientRisk {
     patient_id: string;
+    patient_name?: string;
     risk_score: number;
     risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
     risk_factors: string[];
     appointment_id?: string;
+    appointment_date?: string;
+    appointment_time?: string;
+}
+
+type PythonVolumeForecastResponse = {
+    forecast?: Array<{
+        month?: string;
+        date?: string;
+        predicted?: number;
+        lower?: number;
+        upper?: number;
+    }>;
+    dates?: string[];
+    predicted_volume?: number[];
+    confidence_intervals?: {
+        lower: number[];
+        upper: number[];
+    };
+};
+
+type PythonRiskResponse = PatientRisk[] | {
+    patients?: PatientRisk[];
+};
+
+function normalizeVolumeForecast(data: PythonVolumeForecastResponse): VolumeForecast | null {
+    if (Array.isArray(data.dates) && Array.isArray(data.predicted_volume)) {
+        return {
+            dates: data.dates,
+            predicted_volume: data.predicted_volume.map((value) => Number(value) || 0),
+            confidence_intervals: data.confidence_intervals,
+        };
+    }
+
+    if (!Array.isArray(data.forecast)) return null;
+
+    const dates = data.forecast.map((row) => {
+        if (row.date) return row.date;
+        return row.month ? `${row.month}-01` : new Date().toISOString().split('T')[0];
+    });
+
+    return {
+        dates,
+        predicted_volume: data.forecast.map((row) => Number(row.predicted) || 0),
+        confidence_intervals: {
+            lower: data.forecast.map((row) => Number(row.lower) || 0),
+            upper: data.forecast.map((row) => Number(row.upper) || 0),
+        },
+    };
+}
+
+function normalizePatientRisks(data: PythonRiskResponse): PatientRisk[] {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.patients)) return data.patients;
+    return [];
 }
 
 export interface DiseasePattern {
@@ -137,7 +192,7 @@ class AnalyticsService {
             }
 
             const result = await response.json();
-            return result.success ? result.data : null;
+            return result.success ? normalizeVolumeForecast(result.data) : null;
         } catch (error) {
             console.error('Error fetching volume forecast:', error);
             return null;
@@ -162,7 +217,7 @@ class AnalyticsService {
             }
 
             const result = await response.json();
-            return result.success ? result.data : null;
+            return result.success ? normalizePatientRisks(result.data) : null;
         } catch (error) {
             console.error('Error fetching patient risks:', error);
             return null;

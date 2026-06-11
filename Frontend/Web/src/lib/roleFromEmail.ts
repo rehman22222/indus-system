@@ -1,4 +1,4 @@
-import type { UserRole } from '@/integrations/supabase/types';
+import type { UserRole } from '@/integrations/mongodb/types';
 
 /**
  * Single source of truth for "which portal does this email belong to?"

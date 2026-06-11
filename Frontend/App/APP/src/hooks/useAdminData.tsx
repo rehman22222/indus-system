@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { format } from 'date-fns';
 
 export interface AppointmentStats {
@@ -54,7 +54,7 @@ export function useAdminStats(selectedDate: Date) {
       setIsLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-      const { data: appointments, error: apptError } = await supabase
+      const { data: appointments, error: apptError } = await MongoDB
         .from('appointments')
         .select(`
           id,
@@ -98,7 +98,7 @@ export function useAdminStats(selectedDate: Date) {
         setAvgWaitTime(Math.round(totalWaitMs / patientsWithWait.length / 60000));
       }
 
-      const { data: doctors, error: docError } = await supabase
+      const { data: doctors, error: docError } = await MongoDB
         .from('doctors')
         .select(`
           id,
@@ -169,7 +169,7 @@ export function useAdminStats(selectedDate: Date) {
   useEffect(() => {
     fetchStats();
 
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-appointments')
       .on(
         'postgres_changes',
@@ -179,7 +179,7 @@ export function useAdminStats(selectedDate: Date) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [fetchStats]);
 
@@ -201,7 +201,7 @@ export function useNotifications() {
   const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false })
@@ -219,7 +219,7 @@ export function useNotifications() {
 
   useEffect(() => {
     fetchNotifications();
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-notifications')
       .on(
         'postgres_changes',
@@ -229,12 +229,12 @@ export function useNotifications() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [fetchNotifications]);
 
   const markAsRead = async (notificationId: string) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('notifications')
       .update({ is_read: true })
       .eq('id', notificationId);
@@ -257,7 +257,7 @@ export function useAdminDoctorManagement() {
   const fetchDoctors = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('doctors')
         .select(`
           id, full_name, license_no, email, phone, specialty,
@@ -282,7 +282,7 @@ export function useAdminDoctorManagement() {
   }, [fetchDoctors]);
 
   const createDoctor = async (doctorData: any) => {
-    const { data, error } = await supabase.from('doctors').insert({
+    const { data, error } = await MongoDB.from('doctors').insert({
       full_name: doctorData.name,
       license_no: `PMC-${Date.now()}`,
       specialty: doctorData.specialty,
@@ -301,7 +301,7 @@ export function useAdminDoctorManagement() {
   const updateDoctor = async (doctorId: string, updates: any) => {
     const { name, ...rest } = updates;
     const dbUpdates = name !== undefined ? { ...rest, full_name: name } : rest;
-    const { error } = await supabase.from('doctors').update(dbUpdates).eq('id', doctorId);
+    const { error } = await MongoDB.from('doctors').update(dbUpdates).eq('id', doctorId);
     if (!error) await fetchDoctors();
     return { error };
   };
@@ -317,7 +317,7 @@ export function useAdminAppointments(selectedDate: Date) {
     try {
       setIsLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('appointments')
         .select(`
           id, token, patient_id, doctor_id, appointment_date, appointment_time,
@@ -342,7 +342,7 @@ export function useAdminAppointments(selectedDate: Date) {
 
   useEffect(() => {
     fetchAppointments();
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-appointments-list')
       .on(
         'postgres_changes',
@@ -351,12 +351,12 @@ export function useAdminAppointments(selectedDate: Date) {
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [fetchAppointments]);
 
   const updateAppointmentStatus = async (appointmentId: string, status: string) => {
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', appointmentId);
+    const { error } = await MongoDB.from('appointments').update({ status }).eq('id', appointmentId);
     return { error };
   };
 
@@ -371,7 +371,7 @@ export function useAdminPatients(selectedDate: Date) {
     try {
       setIsLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const { data: appointments, error } = await supabase
+      const { data: appointments, error } = await MongoDB
         .from('appointments')
         .select(`
           id, token, patient_id, doctor_id, appointment_date, appointment_time,

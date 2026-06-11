@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export function QueueMonitor({ selectedDate }: QueueMonitorProps) {
       setIsLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('appointments')
         .select(`
           id, token, status, appointment_type, appointment_time,
@@ -75,11 +75,11 @@ export function QueueMonitor({ selectedDate }: QueueMonitorProps) {
 
   useEffect(() => {
     fetchQueue();
-    const channel = supabase
+    const channel = MongoDB
       .channel('queue-monitor')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => fetchQueue())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { MongoDB.removeChannel(channel); };
   }, [fetchQueue]);
 
   const notArrived = useMemo(() => queueItems.filter(i => i.status === 'confirmed'), [queueItems]);

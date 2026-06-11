@@ -1,15 +1,21 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDepartments } from '../../hooks/useDepartments';
+import type { Department } from '../../hooks/useDepartments';
 import { colors, radius, spacing } from '../../lib/theme';
 
-const SpecialtySelectionScreen = ({ route, navigation }) => {
+type SpecialtySelectionProps = {
+  route?: { params?: { patientId?: string; userId?: string } };
+  navigation?: any;
+};
+
+const SpecialtySelectionScreen = ({ route, navigation }: SpecialtySelectionProps) => {
   // Carry the patient identity through the whole booking flow; without this the
   // downstream screens receive patientId=undefined and booking fails.
-  const { patientId, userId } = route.params || {};
+  const { patientId, userId } = route?.params || {};
   const { departments, isLoading, error } = useDepartments();
 
-  const onSelectSpecialty = (dept) => {
+  const onSelectSpecialty = (dept: Department) => {
     navigation.navigate('DoctorSelection', {
       specialtyId: dept.id,
       specialtyName: dept.name,
@@ -18,7 +24,7 @@ const SpecialtySelectionScreen = ({ route, navigation }) => {
     });
   };
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item }: { item: Department }) => (
     <TouchableOpacity style={styles.item} onPress={() => onSelectSpecialty(item)}>
       <View style={styles.itemContent}>
         <View style={[styles.iconContainer, { backgroundColor: (item.color || colors.primary) + '15' }]}>

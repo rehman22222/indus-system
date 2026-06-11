@@ -105,19 +105,31 @@ def _statistical_forecast(monthly: pd.DataFrame, periods: int) -> dict:
         }
 
     avg = monthly["y"].mean()
-    std = monthly["y"].std() or avg * 0.1
+    if pd.isna(avg):
+        avg = 0
+
+    std = monthly["y"].std()
+    if pd.isna(std) or std <= 0:
+        std = max(avg * 0.1, 1)
+
     trend = (monthly["y"].iloc[-1] - monthly["y"].iloc[0]) / max(len(monthly), 1)
+    if pd.isna(trend):
+        trend = 0
     last_date = monthly["ds"].max()
 
     forecast = []
     for i in range(1, periods + 1):
         month_date = last_date + pd.DateOffset(months=i)
         predicted = max(0, avg + trend * i)
+        if pd.isna(predicted):
+            predicted = max(avg, 0)
+        lower = max(0, predicted - 1.96 * std)
+        upper = max(predicted, predicted + 1.96 * std)
         forecast.append({
             "month": month_date.strftime("%Y-%m"),
-            "predicted": int(predicted),
-            "lower": max(0, int(predicted - 1.96 * std)),
-            "upper": int(predicted + 1.96 * std),
+            "predicted": int(round(predicted)),
+            "lower": int(round(lower)),
+            "upper": int(round(upper)),
             "trend": "up" if trend > 0 else "down",
         })
 

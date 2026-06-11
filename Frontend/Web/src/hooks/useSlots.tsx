@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 export interface AvailableSlot {
   id: string;
@@ -20,13 +20,13 @@ export function useAvailableSlots() {
     setIsLoading(true);
     try {
       // First try to generate slots if none exist
-      await supabase.rpc('generate_daily_slots', {
+      await MongoDB.rpc('generate_daily_slots', {
         p_doctor_id: doctorId,
         p_date: date,
       });
 
       // Fetch free slots from appointment_slots table
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('appointment_slots')
         .select('id, slot_time, is_available')
         .eq('doctor_id', doctorId)

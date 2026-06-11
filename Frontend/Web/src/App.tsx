@@ -13,7 +13,7 @@ import { LoadingSpinner } from "./components/ui/LoadingSpinner";
 const Index = lazy(() => import("./pages/Index"));
 const ManagementPortal = lazy(() => import("./pages/ManagementPortal"));
 const AdminPortal = lazy(() => import("./pages/AdminPortal"));
-const PatientApp = lazy(() => import("./pages/PatientApp"));
+const PatientMobileOnly = lazy(() => import("./pages/PatientMobileOnly"));
 const DoctorApp = lazy(() => import("./pages/DoctorApp"));
 const CheckInKiosk = lazy(() => import("./pages/CheckInKiosk"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -44,7 +44,8 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/management" element={<ManagementPortal />} />
                   <Route path="/admin" element={<AdminPortal />} />
-                  <Route path="/patient" element={<PatientApp />} />
+                  <Route path="/patient" element={<PatientMobileOnly />} />
+                  <Route path="/patient-mobile" element={<PatientMobileOnly />} />
                   <Route path="/doctor" element={<DoctorApp />} />
                   <Route path="/check-in" element={<CheckInKiosk />} />
                   <Route path="/reset-password" element={<ResetPassword />} />

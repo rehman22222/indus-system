@@ -1,19 +1,19 @@
 # Database Documentation
 
 ## Overview
-PostgreSQL database hosted on Supabase for INDUS Hospital Management System.
+MongoDB database hosted on MONGODB for INDUS Hospital Management System.
 
-**Provider:** Supabase  
+**Provider:** MONGODB  
 **Project ID:** vlcbwrfydjjnsjtuismw  
-**Database:** PostgreSQL 15  
+**Database:** MongoDB 15  
 **Schema:** public  
 
 ---
 
 ## Connection Details
 
-**Project URL:** https://vlcbwrfydjjnsjtuismw.supabase.co  
-**Database URL:** `postgresql://postgres:[PASSWORD]@db.vlcbwrfydjjnsjtuismw.supabase.co:5432/postgres`  
+**Project URL:** <removed>  
+**Database URL:** `MongoDB://postgres:[PASSWORD]@<removed>:5432/postgres`  
 
 **Keys:**
 - **Anon Key:** (Public, safe for frontend)
@@ -689,7 +689,7 @@ psql $DATABASE_URL < FYP/Database/04_admin.sql
 psql $DATABASE_URL < FYP/Database/05_otp.sql
 ```
 
-### Via Supabase Dashboard
+### Via MONGODB Dashboard
 1. Go to SQL Editor
 2. Copy content from `00_complete_schema.sql`
 3. Paste and click "Run"
@@ -699,7 +699,7 @@ psql $DATABASE_URL < FYP/Database/05_otp.sql
 ## Backup & Recovery
 
 ### Automatic Backups
-Supabase provides:
+MONGODB provides:
 - Daily automated backups
 - Point-in-time recovery (PITR)
 - 7-day retention on free tier
@@ -722,11 +722,11 @@ psql $DATABASE_URL < backup_20260604.sql
 - ✅ Composite indexes on frequently queried columns
 - ✅ Partial indexes where applicable
 - ✅ JSONB indexing for medical_history
-- ✅ Connection pooling (via Supabase)
+- ✅ Connection pooling (via MONGODB)
 - ✅ Query optimization with proper joins
 
 ### Monitoring
-- Use Supabase dashboard for query performance
+- Use MONGODB dashboard for query performance
 - Enable slow query logging
 - Monitor index usage
 
@@ -754,5 +754,5 @@ psql $DATABASE_URL < backup_20260604.sql
 
 **Project:** INDUS Hospital Management System - Database  
 **Version:** 1.0.0  
-**Database Provider:** Supabase (PostgreSQL 15)  
+**Database Provider:** MONGODB (MongoDB 15)  
 **Last Updated:** June 2026

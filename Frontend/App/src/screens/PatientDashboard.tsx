@@ -18,7 +18,7 @@ import { useDoctors } from '../hooks/useDoctors';
 import { format } from 'date-fns';
 import { colors, radius, spacing } from '../lib/theme';
 
-const PatientDashboard = ({ navigation }) => {
+const PatientDashboard = ({ navigation }: { navigation: any }) => {
   const { user, signOut } = useAuth();
   const { patient, isLoading: patientLoading } = usePatientByUserId(user?.id);
   const { appointments, loading: appointmentsLoading, fetchAppointments } = useAppointments(patient?.id);

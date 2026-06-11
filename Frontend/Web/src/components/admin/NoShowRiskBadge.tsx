@@ -9,7 +9,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { explainNoShowRisk } from '@/lib/groqService';
 import { getNoShowRiskLabel } from '@/lib/noShowPredictor';
-import type { NoShowRiskLabel } from '@/integrations/supabase/types';
+import type { NoShowRiskLabel } from '@/integrations/mongodb/types';
 
 interface NoShowRiskBadgeProps {
     score?: number;

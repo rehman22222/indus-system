@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-    supabase,
-    isSupabaseConfigured,
-} from '@/integrations/supabase/client';
+    MongoDB,
+    isMongoConfigured,
+} from '@/integrations/mongodb/client';
 import { env } from '@/lib/env';
 import { getCached, setCached, CACHE_TTL } from '@/lib/queryCache';
 
@@ -59,14 +59,14 @@ export function useAnalytics(date?: string) {
             setLoading(true);
             setError(null);
 
-            if (!isSupabaseConfigured) {
-                setError('Supabase not configured');
+            if (!isMongoConfigured) {
+                setError('MongoDB not configured');
                 setLoading(false);
                 return;
             }
 
             try {
-                const { data: appointments, error: queryError } = await supabase
+                const { data: appointments, error: queryError } = await MongoDB
                     .from('appointments')
                     .select(`
                         id, status, appointment_time, appointment_type,
@@ -131,14 +131,14 @@ export function useMLAnalytics() {
             setLoading(true);
             setError(null);
 
-            if (!isSupabaseConfigured) {
-                setError('Supabase not configured');
+            if (!isMongoConfigured) {
+                setError('MongoDB not configured');
                 setLoading(false);
                 return;
             }
 
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session } } = await MongoDB.auth.getSession();
                 if (!session) {
                     setError('No active session');
                     setLoading(false);
@@ -171,14 +171,14 @@ export function useMLAnalytics() {
         setLoading(true);
         setError(null);
 
-        if (!isSupabaseConfigured) {
-            setError('Supabase not configured');
+        if (!isMongoConfigured) {
+            setError('MongoDB not configured');
             setLoading(false);
             return;
         }
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await MongoDB.auth.getSession();
             if (!session) {
                 setError('No active session');
                 setLoading(false);

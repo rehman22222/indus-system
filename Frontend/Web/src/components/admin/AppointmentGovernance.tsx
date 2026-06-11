@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ export function AppointmentGovernance({
         setLoading(true);
         setError(null);
         try {
-            const { error: updateError } = await supabase
+            const { error: updateError } = await MongoDB
                 .from('appointments')
                 .update({
                     governance_status: action,
@@ -37,7 +37,7 @@ export function AppointmentGovernance({
             if (updateError) throw updateError;
 
             // Write audit log
-            await supabase.from('audit_logs').insert({
+            await MongoDB.from('audit_logs').insert({
                 actor_user_id: managerId,
                 action: `appointment_${action}`,
                 entity_type: 'appointments',

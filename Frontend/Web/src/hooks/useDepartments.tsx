@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 export interface Department {
   id: string;
@@ -33,14 +33,14 @@ export function useDepartments() {
   const fetchDepartments = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('departments')
         .select(SELECT_COLS)
         .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
-      // Live Supabase rows only. No static fallback — empty table
+      // Live MongoDB rows only. No static fallback — empty table
       // means an empty list.
       setDepartments((data || []) as Department[]);
     } catch (err) {
@@ -65,7 +65,7 @@ export function useDepartments() {
         return { data: null, error: new Error('A department with this name already exists.') };
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('departments')
         .insert({
           name,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { DEPARTMENT_LIST_SELECT } from '@/integrations/supabase/queries';
+import { MongoDB } from '@/integrations/mongodb/client';
+import { DEPARTMENT_LIST_SELECT } from '@/integrations/mongodb/queries';
 
 export interface Department {
   id: string;
@@ -21,7 +21,7 @@ export function useDepartments() {
       setError(null);
 
       try {
-        const { data, error: fetchErr } = await supabase
+        const { data, error: fetchErr } = await MongoDB
           .from('departments')
           .select(DEPARTMENT_LIST_SELECT)
           .eq('is_active', true)

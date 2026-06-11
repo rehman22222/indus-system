@@ -3,7 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient;
+
+function getResendClient() {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 /**
  * Send OTP email using Resend
@@ -14,7 +24,7 @@ export const sendOTPEmail = async (to, otp, name = 'User') => {
     const fromName = process.env.OTP_FROM_NAME || 'INDUS Hospital';
     const fromEmail = process.env.OTP_FROM_EMAIL || 'onboarding@resend.dev';
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${fromName} <${fromEmail}>`,
       to,
       subject: `Your OTP Code: ${otp}`,
@@ -65,7 +75,7 @@ export const sendAppointmentConfirmation = async (to, appointmentDetails) => {
     const fromName = process.env.OTP_FROM_NAME || 'INDUS Hospital';
     const fromEmail = process.env.OTP_FROM_EMAIL || 'onboarding@resend.dev';
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${fromName} <${fromEmail}>`,
       to,
       subject: 'Appointment Confirmation - INDUS Hospital',

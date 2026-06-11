@@ -2,10 +2,12 @@ import express from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 import {
+    createDoctor,
     getAllDoctors,
     getDoctorById,
     getDoctorsByDepartment,
-    getDoctorSlots
+    getDoctorSlots,
+    updateDoctor,
 } from '../controllers/doctor.controller.js';
 
 const router = express.Router();
@@ -20,12 +22,14 @@ router.get(
 );
 
 /**
- * GET /api/v1/doctors/:id
- * Get doctor by ID
+ * POST /api/v1/doctors
+ * Create doctor profile
  */
-router.get(
-    '/:id',
-    asyncHandler(getDoctorById)
+router.post(
+    '/',
+    authMiddleware,
+    requireRole(['admin', 'management']),
+    asyncHandler(createDoctor)
 );
 
 /**
@@ -35,6 +39,26 @@ router.get(
 router.get(
     '/department/:departmentId',
     asyncHandler(getDoctorsByDepartment)
+);
+
+/**
+ * GET /api/v1/doctors/:id
+ * Get doctor by ID
+ */
+router.get(
+    '/:id',
+    asyncHandler(getDoctorById)
+);
+
+/**
+ * PATCH /api/v1/doctors/:id
+ * Update doctor profile
+ */
+router.patch(
+    '/:id',
+    authMiddleware,
+    requireRole(['admin', 'management']),
+    asyncHandler(updateDoctor)
 );
 
 /**

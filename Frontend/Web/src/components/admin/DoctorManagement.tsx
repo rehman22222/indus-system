@@ -258,7 +258,7 @@ export function DoctorManagement() {
       });
       setIsCredentialsOpen(false);
       setCredentials({ email: '', password: '', confirmPassword: '', fullName: '', phone: '', role: 'doctor', specialty: '', departmentId: '', dailyPhysicalQuota: 30, dailyVideoQuota: 10 });
-      // Re-pull live Supabase rows so the newly-inserted doctor card
+      // Re-pull live MongoDB rows so the newly-inserted doctor card
       // appears immediately without a manual refresh.
       if (credentials.role === 'doctor') await refetch();
     } else {
@@ -478,7 +478,7 @@ export function DoctorManagement() {
             open={isCredentialsOpen}
             onOpenChange={(open) => {
               setIsCredentialsOpen(open);
-              // Fetch the departments list live from Supabase each time
+              // Fetch the departments list live from MongoDB each time
               // the Create Staff form opens so the dropdown is current.
               if (open) refetchDepartments();
             }}

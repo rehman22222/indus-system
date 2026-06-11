@@ -15,15 +15,12 @@ router.post(
     '/create-room',
     authMiddleware,
     [
-        body('appointmentId')
-            .notEmpty()
-            .withMessage('Appointment ID is required'),
-        body('patientId')
-            .notEmpty()
-            .withMessage('Patient ID is required'),
-        body('doctorId')
-            .notEmpty()
-            .withMessage('Doctor ID is required'),
+        body().custom((_, { req }) => {
+            if (!req.body.appointmentId && !req.body.appointment_id) {
+                throw new Error('Appointment ID is required');
+            }
+            return true;
+        }),
         validate
     ],
     asyncHandler(createVideoRoom)

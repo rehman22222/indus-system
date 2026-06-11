@@ -19,7 +19,7 @@
 // Patients self-register via the sign-up flow.
 
 import { useSyncExternalStore } from 'react';
-import type { UserRole } from '@/integrations/supabase/types';
+import type { UserRole } from '@/integrations/mongodb/types';
 
 // Admin can create accounts for roles beyond the four portal roles.
 // RECEPTIONIST has no dedicated dashboard, so it lands on the check-in
@@ -190,7 +190,7 @@ export const authStore = {
      * Receptionist). Idempotent on email — re-creating updates the
      * password/role/name. Called from the staff-creation flow so the
      * new account can immediately log in via the unified login page,
-     * regardless of Supabase connectivity.
+     * regardless of MongoDB connectivity.
      */
     addStaffAccount(
         email: string,
@@ -214,9 +214,9 @@ export const authStore = {
     },
 
     /**
-     * Patient-only: mirror a Supabase-Auth-verified patient into the
+     * Patient-only: mirror a MongoDB-Auth-verified patient into the
      * in-memory registry so the existing session/routing keeps working.
-     * Real email verification / password is owned by Supabase Auth.
+     * Real email verification / password is owned by MongoDB Auth.
      * Idempotent on email.
      */
     syncPatientAccount(

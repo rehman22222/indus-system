@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCreateAppointment } from './useAppointments';
 
-// Mock the Supabase client so importing the hook doesn't construct a real
+// Mock the MongoDB client so importing the hook doesn't construct a real
 // client (and so a validation-only test makes no network calls).
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
+vi.mock('@/integrations/mongodb/client', () => ({
+  MongoDB: {
     from: vi.fn(),
     functions: { invoke: vi.fn() },
   },

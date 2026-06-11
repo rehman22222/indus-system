@@ -13,16 +13,31 @@ import { format } from 'date-fns';
 import { colors, radius, spacing } from '../../lib/theme';
 import { CheckCircle2, Stethoscope, Calendar as CalendarIcon, Clock, MapPin, Video, FileText } from 'lucide-react';
 
-const ConfirmationScreen = ({ route, navigation }) => {
+type ConfirmationProps = {
+  route?: {
+    params: {
+      doctorId: string;
+      doctorName: string;
+      doctorSpecialty: string;
+      appointmentDate: string;
+      appointmentTime: string;
+      patientId: string;
+      userId?: string;
+    };
+  };
+  navigation?: any;
+};
+
+const ConfirmationScreen = ({ route, navigation }: ConfirmationProps) => {
   const { 
-    doctorId, 
-    doctorName, 
-    doctorSpecialty, 
-    appointmentDate, 
-    appointmentTime, 
-    patientId,
+    doctorId = '', 
+    doctorName = '', 
+    doctorSpecialty = '', 
+    appointmentDate = new Date().toISOString(), 
+    appointmentTime = '', 
+    patientId = '',
     userId 
-  } = route.params;
+  } = route?.params || {};
 
   const [appointmentType, setAppointmentType] = useState<'physical' | 'video'>('physical');
   const [chiefComplaint, setChiefComplaint] = useState('');
@@ -31,6 +46,11 @@ const ConfirmationScreen = ({ route, navigation }) => {
   const [token, setToken] = useState('');
 
   const handleConfirm = async () => {
+    if (!patientId) {
+      Alert.alert('Error', 'Patient profile is missing. Please sign in again.');
+      return;
+    }
+
     try {
       const { data, error } = await createAppointment({
         patient_id: patientId,

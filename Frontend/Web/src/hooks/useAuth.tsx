@@ -1,21 +1,18 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import type { UserRole } from '@/integrations/supabase/types';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import type { Session, User } from '@/integrations/mongodb/client';
+import type { UserRole } from '@/integrations/mongodb/types';
 import { authStore, useAuthSession } from '@/auth/authStore';
-import { roleFromEmail } from '@/lib/roleFromEmail';
 
-// AppRole is the same union as UserRole; kept exported for legacy callers.
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000';
+
 export type AppRole = UserRole;
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  /**
-   * The user's role(s). The DB stores a single role on `public.users.role`,
-   * but this is exposed as an array to preserve the existing call sites
-   * (e.g. `roles.includes('ADMIN')`).
-   */
   roles: AppRole[];
   isLoading: boolean;
   signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: Error | null }>;
@@ -25,157 +22,151 @@ interface AuthContextType {
   isStaff: () => boolean;
 }
 
+type LoginResponse = {
+  success: boolean;
+  token: string;
+  user: User & { role?: string; name?: string };
+  message?: string;
+  error?: string;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function normalizeRole(role?: string): AppRole {
+  const value = String(role || 'patient').trim().toUpperCase();
+  if (value === 'ADMIN' || value === 'DOCTOR' || value === 'MANAGEMENT' || value === 'PATIENT') {
+    return value;
+  }
+  return 'PATIENT';
+}
+
+function getStoredSession(): { token: string; user: User & { role?: string } } | null {
+  try {
+    const token = localStorage.getItem('auth_token');
+    const rawUser = localStorage.getItem('user');
+    if (!token || !rawUser) return null;
+    return { token, user: JSON.parse(rawUser) };
+  } catch {
+    return null;
+  }
+}
+
+function persistSession(token: string, user: User) {
+  localStorage.setItem('auth_token', token);
+  localStorage.setItem('user', JSON.stringify(user));
+}
+
+function clearSession() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
+}
+
+function makeSession(token: string, user: User): Session {
+  return { access_token: token, user };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const sessionUser = useAuthSession();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Defer to avoid auth-state-change deadlock
-          setTimeout(() => resolveRole(session.user), 0);
-        } else {
-          setRoles([]);
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        resolveRole(session.user);
+    const hydrate = () => {
+      const stored = getStoredSession();
+      if (stored) {
+        setUser(stored.user);
+        setSession(makeSession(stored.token, stored.user));
+        setRoles([normalizeRole(stored.user.role)]);
+      } else {
+        setUser(null);
+        setSession(null);
+        setRoles([]);
       }
       setIsLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    hydrate();
+    window.addEventListener('mongo-auth-change', hydrate);
+    return () => window.removeEventListener('mongo-auth-change', hydrate);
   }, []);
 
-  // Role resolution is driven by the email address first:
-  //   admin<n>@indus.org.pk      → ADMIN
-  //   doctor<n>@indus.org.pk     → DOCTOR
-  //   management<n>@indus.org.pk → MANAGEMENT
-  //   anything else              → PATIENT (default)
-  //
-  // This makes routing deterministic regardless of what was stored in
-  // user_metadata (older accounts created before this rule still route
-  // correctly on next login). user_metadata.role is still respected as
-  // an escape hatch if you ever need a custom-email staff account.
-  const resolveRole = async (u: User) => {
-    const emailRole = roleFromEmail(u.email);
-    if (emailRole) {
-      setRoles([emailRole]);
-      return;
-    }
-    const metaRole = (u.user_metadata as { role?: string } | undefined)?.role;
-    if (metaRole === 'ADMIN' || metaRole === 'DOCTOR' || metaRole === 'MANAGEMENT') {
-      setRoles([metaRole]);
-      return;
-    }
-    // Custom emails always land in the patient portal.
-    setRoles(['PATIENT']);
-  };
-
-  const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
+  const signUp = async (email: string, _password: string, fullName: string, phone?: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-            phone: phone ?? null,
-            // The DB trigger reads this and inserts public.users.role.
-            // Defaults to 'PATIENT' when missing.
-            role: 'PATIENT',
-          },
-        },
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), name: fullName, phone }),
       });
-      return { error: (error as Error) ?? null };
-    } catch (err) {
-      return { error: err as Error };
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        return { error: new Error(data.message || data.error || 'Could not start signup.') };
+      }
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error: (error as Error) ?? null };
-    } catch (err) {
-      return { error: err as Error };
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const data = (await response.json().catch(() => ({}))) as LoginResponse;
+
+      if (!response.ok || !data.success || !data.token || !data.user) {
+        return { error: new Error(data.message || data.error || 'Invalid email or password.') };
+      }
+
+      persistSession(data.token, data.user);
+      setUser(data.user);
+      setSession(makeSession(data.token, data.user));
+      setRoles([normalizeRole(data.user.role)]);
+      authStore.logout();
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
     }
   };
 
   const signOut = async () => {
-    // Clear the in-memory auth wrapper too so the AuthGate returns to
-    // the login screen.
+    clearSession();
     authStore.logout();
-    await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setRoles([]);
   };
 
-  // --- in-memory auth bridge -------------------------------------
-  // The unified login wrapper (src/auth) is the real entry point.
-  // When it has an authenticated user, surface a synthetic Supabase
-  // `user` + `roles` so every existing dashboard (which gates on
-  // useAuth().user / roles) renders without its own legacy auth
-  // screen. When there is no in-memory user we fall back to the
-  // original Supabase-driven state untouched.
-  const sessionUser = useAuthSession();
-
   const effectiveUser: User | null = sessionUser
-    ? ({ id: sessionUser.email, email: sessionUser.email } as unknown as User)
+    ? { id: sessionUser.email, email: sessionUser.email, role: sessionUser.role }
     : user;
 
-  // sessionUser.role may be RECEPTIONIST, which is not a portal AppRole.
-  // Receptionist has no role-gated dashboard (it lands on /check-in via
-  // ROLE_ROUTE), so it simply contributes no portal role here.
-  // Real Supabase patients have no public.users row, so fetchUserRole
-  // returns []. Fall back to the role stamped into auth user_metadata
-  // at signup (we set role: 'PATIENT').
-  const metaRole = ((user?.user_metadata as { role?: string } | undefined)?.role) as
-    | AppRole
-    | undefined;
-
   const effectiveRoles: AppRole[] = sessionUser
-    ? ([sessionUser.role].filter(
-        (r): r is AppRole => r === 'ADMIN' || r === 'DOCTOR' || r === 'PATIENT' || r === 'MANAGEMENT',
-      ))
-    : (roles.length
-        ? roles
-        : (metaRole === 'ADMIN' || metaRole === 'DOCTOR' || metaRole === 'PATIENT' || metaRole === 'MANAGEMENT'
-            ? [metaRole]
-            : []));
+    ? [normalizeRole(sessionUser.role)]
+    : roles;
 
   const hasRole = (role: AppRole) => effectiveRoles.includes(role);
-
-  const isStaff = () => effectiveRoles.some((r) => r === 'ADMIN' || r === 'DOCTOR' || r === 'MANAGEMENT');
+  const isStaff = () => effectiveRoles.some((role) => role === 'ADMIN' || role === 'DOCTOR' || role === 'MANAGEMENT');
 
   return (
-    <AuthContext.Provider value={{
-      user: effectiveUser,
-      session,
-      roles: effectiveRoles,
-      isLoading: sessionUser ? false : isLoading,
-      signUp,
-      signIn,
-      signOut,
-      hasRole,
-      isStaff,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user: effectiveUser,
+        session,
+        roles: effectiveRoles,
+        isLoading: sessionUser ? false : isLoading,
+        signUp,
+        signIn,
+        signOut,
+        hasRole,
+        isStaff,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

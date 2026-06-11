@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSystemSettings } from '@/hooks/useAdminData';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { format } from 'date-fns';
 
 const FEATURE_TOGGLES = [
@@ -50,7 +50,7 @@ export function AdminSettings() {
     const fetchLogs = async () => {
       setLoadingLogs(true);
       try {
-        const { data } = await supabase
+        const { data } = await MongoDB
           .from('audit_logs')
           .select('id, actor_user_id, action, entity_type, entity_id, ip_address, user_agent, timestamp')
           .order('timestamp', { ascending: false })
@@ -62,17 +62,17 @@ export function AdminSettings() {
     fetchLogs();
 
     // Real-time subscription for audit logs
-    const channel = supabase
+    const channel = MongoDB
       .channel('audit-logs-rt')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, () => fetchLogs())
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { MongoDB.removeChannel(channel); };
   }, []);
 
   const addAuditEntry = async (action: string, details: string) => {
     try {
-      await supabase.rpc('write_audit_log', {
+      await MongoDB.rpc('write_audit_log', {
         p_action: action,
         p_entity_type: 'system_settings',
         p_new_value: { details } as any,
@@ -96,7 +96,7 @@ export function AdminSettings() {
 
   const handleForceBackup = async () => {
     // Check if backup already in progress
-    const { data: runningBackup } = await supabase
+    const { data: runningBackup } = await MongoDB
       .from('backup_jobs')
       .select('id')
       .in('status', ['queued', 'running'])
@@ -108,7 +108,7 @@ export function AdminSettings() {
     }
 
     // Create backup job
-    const { data: job, error } = await supabase.from('backup_jobs').insert({
+    const { data: job, error } = await MongoDB.from('backup_jobs').insert({
       status: 'queued',
       triggered_by: null, // Will be set by auth context
     }).select().single();
@@ -119,14 +119,14 @@ export function AdminSettings() {
     }
 
     // Simulate backup process (in production this would be a real backup)
-    await supabase.from('backup_jobs').update({ 
+    await MongoDB.from('backup_jobs').update({ 
       status: 'running', 
       started_at: new Date().toISOString() 
     }).eq('id', job.id);
 
     // Simulate completion
     setTimeout(async () => {
-      await supabase.from('backup_jobs').update({ 
+      await MongoDB.from('backup_jobs').update({ 
         status: 'succeeded', 
         completed_at: new Date().toISOString(),
         artifact_uri: `backups/${format(new Date(), 'yyyy-MM-dd_HH-mm')}.sql.gz`,
@@ -141,7 +141,7 @@ export function AdminSettings() {
   const handleExportAll = async () => {
     try {
       // Export appointments
-      const { data: appts } = await supabase.from('appointments').select('id, token, appointment_date, appointment_time, appointment_type, status, patient:patients(full_name, indus_id), doctor:doctors(full_name)').order('appointment_date', { ascending: false }).limit(500);
+      const { data: appts } = await MongoDB.from('appointments').select('id, token, appointment_date, appointment_time, appointment_type, status, patient:patients(full_name, indus_id), doctor:doctors(full_name)').order('appointment_date', { ascending: false }).limit(500);
       const headers = ['Date', 'Time', 'Token', 'Patient', 'Patient ID', 'Doctor', 'Type', 'Status', 'Chief Complaint'];
       const rows = (appts || []).map((a: any) => [
         a.appointment_date, a.appointment_time, a.token,

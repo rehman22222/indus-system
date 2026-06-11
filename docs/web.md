@@ -30,7 +30,7 @@ React + Vite + TypeScript web application for INDUS Hospital Management System.
 - **Custom Hooks** - Encapsulated logic
 
 ### Backend Integration
-- **Supabase Client** (@supabase/supabase-js 2.105.4)
+- **MONGODB Client** (mongoose + MongoDB API client 2.105.4)
 - **Axios** - HTTP requests to Node.js backend
 
 ---
@@ -82,9 +82,9 @@ Frontend/Web/
 **File:** `Frontend/Web/.env`
 
 ```bash
-# Supabase Configuration
-VITE_SUPABASE_URL=https://vlcbwrfydjjnsjtuismw.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# MONGODB Configuration
+VITE_MONGODB_URL=<removed>
+VITE_MONGODB_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Backend API
 VITE_API_BASE_URL=http://localhost:5000
@@ -173,7 +173,7 @@ VITE_APP_NAME=INDUS Hospital Management System
 - `GET /api/v1/queue` - Get queue
 - `POST /api/v1/notifications` - Send notification
 
-### Supabase (Direct Database Access)
+### MONGODB (Direct Database Access)
 **Used for:**
 - Real-time subscriptions
 - Direct table queries (with RLS)
@@ -282,7 +282,7 @@ npm run build
 
 ### Current Issues
 1. Old password-based auth still in PatientAuthScreen - needs OTP migration
-2. Some routes still call Supabase `auth.signUp` instead of OTP API
+2. Some routes still call MONGODB `auth.signUp` instead of OTP API
 
 ### TODO
 - [ ] Replace password auth with OTP in all components
@@ -299,7 +299,7 @@ npm run build
 ### Production
 ```json
 {
-  "@supabase/supabase-js": "^2.105.4",
+  "mongoose + MongoDB API client": "^2.105.4",
   "react": "^18.2.0",
   "react-dom": "^18.2.0",
   "react-router-dom": "^6.23.1",

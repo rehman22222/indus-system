@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { generateUniqueToken } from '@/lib/tokenGenerator';
 import { predictNoShow } from '@/lib/noShowPredictor';
 import type { AppointmentFeatures } from '@/lib/noShowPredictor';
-import { APPOINTMENT_LIST_SELECT, APPOINTMENT_DETAIL_SELECT } from '@/integrations/supabase/queries';
-import type { Appointment, AppointmentStatus, CreateAppointmentResult } from '@/integrations/supabase/types';
+import { APPOINTMENT_LIST_SELECT, APPOINTMENT_DETAIL_SELECT } from '@/integrations/mongodb/queries';
+import type { Appointment, AppointmentStatus, CreateAppointmentResult } from '@/integrations/mongodb/types';
+
+export type { Appointment };
 
 export interface CreateAppointmentInput {
   patient_id: string;
@@ -33,7 +35,7 @@ export function useAppointments(patientId?: string, date?: string) {
     setError(null);
 
     try {
-      let query = supabase
+      let query = MongoDB
         .from('appointments')
         .select(APPOINTMENT_LIST_SELECT)
         .order('appointment_date', { ascending: true });
@@ -88,7 +90,7 @@ export function useAppointments(patientId?: string, date?: string) {
       };
       const prediction = predictNoShow(features);
 
-      // LIVE MODE — create in Supabase
+      // LIVE MODE — create in MongoDB
       try {
         const token = await generateUniqueToken(
           input.doctor_id,
@@ -108,14 +110,14 @@ export function useAppointments(patientId?: string, date?: string) {
           governance_status: 'pending',
         };
 
-        const { data, error: insertErr } = await supabase
+        const { data, error: insertErr } = await MongoDB
           .from('appointments')
           .insert(insertData)
           .select(APPOINTMENT_DETAIL_SELECT)
           .single();
 
         if (insertErr) {
-          // Handle specific Supabase errors
+          // Handle specific MongoDB errors
           if (insertErr.code === '23505') {
             return {
               success: false,
@@ -132,10 +134,10 @@ export function useAppointments(patientId?: string, date?: string) {
           throw insertErr;
         }
 
-        const created = data as any; // Supabase returns joined data with nested objects
+        const created = data as any; // MongoDB returns joined data with nested objects
 
         // Send FCM notification (non-blocking — don't await)
-        supabase.functions
+        MongoDB.functions
           .invoke('send-notification', {
             body: {
               user_id: input.patient_id,
@@ -207,7 +209,7 @@ export function useDoctorAppointments(doctorId?: string, date?: string) {
     setError(null);
 
     try {
-      let query = supabase
+      let query = MongoDB
         .from('appointments')
         .select(APPOINTMENT_DETAIL_SELECT)
         .eq('doctor_id', doctorId)
@@ -220,7 +222,7 @@ export function useDoctorAppointments(doctorId?: string, date?: string) {
       const { data, error: fetchErr } = await query;
 
       if (fetchErr) throw fetchErr;
-      setAppointments((data ?? []) as any); // Supabase returns joined data
+      setAppointments((data ?? []) as any); // MongoDB returns joined data
     } catch (err) {
       console.error('[useDoctorAppointments] Fetch failed:', err);
       setError('Failed to fetch doctor appointments');
@@ -253,7 +255,7 @@ export function useUpdateAppointment() {
     setIsLoading(true);
 
     try {
-      const { error: updateErr } = await supabase
+      const { error: updateErr } = await MongoDB
         .from('appointments')
         .update(updates)
         .eq('id', appointmentId);
@@ -299,7 +301,7 @@ export function useCheckIn() {
 
       try {
         // Find appointment by token
-        const { data: appointment, error: fetchErr } = await supabase
+        const { data: appointment, error: fetchErr } = await MongoDB
           .from('appointments')
           .select(APPOINTMENT_DETAIL_SELECT)
           .eq('token', token.trim().toUpperCase())
@@ -330,7 +332,7 @@ export function useCheckIn() {
         }
 
         // Mark as checked in
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await MongoDB
           .from('appointments')
           .update({
             status: 'waiting' as AppointmentStatus,
@@ -373,7 +375,7 @@ export function useAdminAppointments(date?: string) {
     setLoading(true);
 
     try {
-      let query = supabase
+      let query = MongoDB
         .from('appointments')
         .select(APPOINTMENT_LIST_SELECT)
         .order('appointment_date', { ascending: false });
@@ -383,7 +385,7 @@ export function useAdminAppointments(date?: string) {
       const { data, error } = await query;
       if (error) throw error;
 
-      setAppointments((data ?? []) as any); // Supabase returns joined data with nested objects
+      setAppointments((data ?? []) as any); // MongoDB returns joined data with nested objects
     } catch (err) {
       console.error('[useAdminAppointments] Fetch failed:', err);
       setAppointments([]);

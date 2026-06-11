@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { AlertCircle, Loader2, User, Mail, Lock, Phone } from 'lucide-react';
 import { ForgotPassword } from './ForgotPassword';
 import indusLogo from '@/assets/indus-logo.svg';

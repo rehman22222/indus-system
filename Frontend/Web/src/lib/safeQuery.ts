@@ -1,12 +1,12 @@
-import { isSupabaseConfigured, markSchemaMissing } from '@/integrations/supabase/client';
+import { isMongoConfigured, markSchemaMissing } from '@/integrations/mongodb/client';
 
 /**
- * Shape of the typical Supabase response: `{ data, error, status, statusText }`.
+ * Shape of the typical MongoDB response: `{ data, error, status, statusText }`.
  * `status` is the HTTP status returned by PostgREST. PostgrestError objects
  * carry a `code` field we use to distinguish "table missing" (42P01) from
  * other errors.
  */
-type SupabaseLikeResponse<T> = {
+type MongoDBLikeResponse<T> = {
     data: T | null;
     error: unknown;
     status?: number;
@@ -16,9 +16,9 @@ type SupabaseLikeResponse<T> = {
 const NETWORK_ERROR_PATTERNS = [
     'ERR_NAME_NOT_RESOLVED',
     'Failed to fetch',
-    'SUPABASE_NOT_CONFIGURED',
-    'SUPABASE_UNREACHABLE',
-    'SUPABASE_SCHEMA_MISSING',
+    'MongoDB_NOT_CONFIGURED',
+    'MongoDB_UNREACHABLE',
+    'MongoDB_SCHEMA_MISSING',
     'NetworkError',
     'net::',
 ];
@@ -32,7 +32,7 @@ function isNetworkError(msg: string): boolean {
  * exist. PostgREST surfaces this as HTTP 404 with PostgrestError code
  * "42P01" / message "relation \"public.<table>\" does not exist".
  */
-function isMissingRelation(result: SupabaseLikeResponse<unknown>): boolean {
+function isMissingRelation(result: MongoDBLikeResponse<unknown>): boolean {
     if (result.status === 404) return true;
     const err = result.error as { code?: string; message?: string } | null;
     if (!err) return false;
@@ -55,7 +55,7 @@ function isMissingRelation(result: SupabaseLikeResponse<unknown>): boolean {
  */
 const warnedMissingTables = new Set<string>();
 
-function warnMissingTableOnce(result: SupabaseLikeResponse<unknown>): void {
+function warnMissingTableOnce(result: MongoDBLikeResponse<unknown>): void {
     const err = result.error as { message?: string } | null;
     const match = err?.message?.match(/relation "?([^"]+)"? does not exist/i);
     const tableName = match?.[1] ?? `<status ${result.status ?? '?'}>`;
@@ -63,21 +63,21 @@ function warnMissingTableOnce(result: SupabaseLikeResponse<unknown>): void {
     warnedMissingTables.add(tableName);
     // eslint-disable-next-line no-console
     console.warn(
-        `[safeQuery] Supabase responded with 404 for "${tableName}" — schema not deployed yet. ` +
-        'Returning fallback data. Apply the migration in supabase/migrations/ and reload to retry.'
+        `[safeQuery] MongoDB responded with 404 for "${tableName}" — schema not deployed yet. ` +
+        'Returning fallback data. Apply the migration in MongoDB/migrations/ and reload to retry.'
     );
 }
 
 /**
- * Wraps any Supabase query with proper error handling and fallback.
+ * Wraps any MongoDB query with proper error handling and fallback.
  * Returns fallback data when offline, when the schema is missing, or
  * on any other error. Never throws.
  */
 export async function safeQuery<T>(
-    queryFn: () => PromiseLike<SupabaseLikeResponse<T>>,
+    queryFn: () => PromiseLike<MongoDBLikeResponse<T>>,
     fallback: T
 ): Promise<T> {
-    if (!isSupabaseConfigured) {
+    if (!isMongoConfigured) {
         return fallback;
     }
 
@@ -117,13 +117,13 @@ export async function safeQuery<T>(
 }
 
 /**
- * Wraps Supabase query with `{ data, error }` return pattern.
+ * Wraps MongoDB query with `{ data, error }` return pattern.
  * Use this when you need to distinguish between offline and other errors.
  */
 export async function safeQueryWithError<T>(
-    queryFn: () => PromiseLike<SupabaseLikeResponse<T>>
+    queryFn: () => PromiseLike<MongoDBLikeResponse<T>>
 ): Promise<{ data: T | null; error: string | null }> {
-    if (!isSupabaseConfigured) {
+    if (!isMongoConfigured) {
         return { data: null, error: 'OFFLINE' };
     }
 

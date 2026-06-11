@@ -19,7 +19,7 @@ The INDUS Hospital Management System mobile app is built with **React Native** a
 - **React Native Web** - Web compatibility layer
 
 ### Backend Integration
-- **Supabase Client 2.105.4** - Database and auth
+- **MONGODB Client 2.105.4** - Database and auth
 - **React Hook Form 7.53.0** - Form management
 - **Zod 3.23.8** - Schema validation
 
@@ -62,8 +62,8 @@ FYP/Frontend/App/
 │   │   └── authStore.ts             # In-memory auth state
 │   │
 │   ├── integrations/             # External service integrations
-│   │   └── supabase/
-│   │       ├── client.ts            # Supabase client setup
+│   │   └── MONGODB/
+│   │       ├── client.ts            # MONGODB client setup
 │   │       └── types.ts             # Database type definitions
 │   │
 │   ├── types/                    # TypeScript type definitions
@@ -90,9 +90,9 @@ FYP/Frontend/App/
 Create `.env` file in `FYP/Frontend/App/`:
 
 ```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://vlcbwrfydjjnsjtuismw.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+# MONGODB Configuration
+VITE_MONGODB_URL=<removed>
+VITE_MONGODB_ANON_KEY=your_MONGODB_anon_key_here
 
 # Backend API (if separate)
 VITE_API_URL=http://localhost:5000/api
@@ -104,7 +104,7 @@ Environment variables are injected at build time using `webpack.DefinePlugin`:
 
 ```javascript
 // Access in code
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const MONGODBUrl = import.meta.env.VITE_MONGODB_URL;
 const apiUrl = import.meta.env.VITE_API_URL;
 ```
 
@@ -187,7 +187,7 @@ Login Screen
 ### 1. Authentication System
 
 **Dual Authentication Mode:**
-- **Online Mode**: Full Supabase authentication with database sync
+- **Online Mode**: Full MONGODB authentication with database sync
 - **Demo Mode**: In-memory authentication with mock credentials
 
 ```typescript
@@ -207,7 +207,7 @@ const {
 **Authentication Flow:**
 1. User opens LoginScreen
 2. Enters credentials or chooses demo mode
-3. `useAuth` validates against Supabase or in-memory store
+3. `useAuth` validates against MONGODB or in-memory store
 4. On success, navigates to role-based dashboard
 5. Session persists via AsyncStorage
 
@@ -299,15 +299,15 @@ import { Card } from '@/components/ui/card';
 
 ## API Integration
 
-### Supabase Client Setup
+### MONGODB Client Setup
 
 ```typescript
-// src/integrations/supabase/client.ts
-import { createClient } from '@supabase/supabase-js';
+// src/integrations/MONGODB/client.ts
+import { createClient } from 'mongoose + MongoDB API client';
 
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+export const MONGODB = createClient(
+  import.meta.env.VITE_MONGODB_URL,
+  import.meta.env.VITE_MONGODB_ANON_KEY
 );
 ```
 
@@ -315,7 +315,7 @@ export const supabase = createClient(
 
 **Fetch Appointments:**
 ```typescript
-const { data, error } = await supabase
+const { data, error } = await MONGODB
   .from('appointments')
   .select('*, doctors(*), patients(*)')
   .eq('patient_id', userId)
@@ -324,7 +324,7 @@ const { data, error } = await supabase
 
 **Create Appointment:**
 ```typescript
-const { data, error } = await supabase
+const { data, error } = await MONGODB
   .from('appointments')
   .insert({
     patient_id: userId,
@@ -480,7 +480,7 @@ test('renders login form', () => {
 ### User Types
 
 ```typescript
-// src/integrations/supabase/types.ts
+// src/integrations/MONGODB/types.ts
 export type UserRole = 
   | 'PATIENT' 
   | 'DOCTOR' 
@@ -594,7 +594,7 @@ export default function NewScreen({ navigation }: NewScreenProps) {
 ```typescript
 // src/services/api.ts
 export async function fetchDoctors() {
-  const { data, error } = await supabase
+  const { data, error } = await MONGODB
     .from('doctors')
     .select('*')
     .eq('is_active', true);

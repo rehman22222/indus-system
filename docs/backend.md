@@ -18,8 +18,8 @@ Node.js + Express REST API for INDUS Hospital Management System.
 - **ES Modules** - Modern JavaScript modules
 
 ### Database & Auth
-- **Supabase Client** 2.105.4 - Database & auth
-- **PostgreSQL** - Via Supabase
+- **MONGODB Client** 2.105.4 - Database & auth
+- **MongoDB** - Via MONGODB
 - **JWT** (jsonwebtoken 9.0.2) - Token authentication
 
 ### Email & Notifications
@@ -46,7 +46,7 @@ Node.js + Express REST API for INDUS Hospital Management System.
 Backend/
 ├── src/
 │   ├── config/
-│   │   └── supabase.js          # Supabase client setup
+│   │   └── MONGODB.js          # MONGODB client setup
 │   ├── controllers/
 │   │   ├── analytics.controller.js
 │   │   ├── appointment.controller.js
@@ -91,10 +91,10 @@ PORT=5000
 NODE_ENV=development
 OTP_DEV_MODE=true
 
-# Supabase Configuration
-SUPABASE_URL=https://vlcbwrfydjjnsjtuismw.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# MONGODB Configuration
+MONGODB_URL=<removed>
+MONGODB_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+MONGODB_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Daily.co Video Configuration
 DAILY_API_KEY=your_daily_api_key_here
@@ -382,8 +382,8 @@ Get dashboard analytics.
 ```
 
 **OTP_DEV_MODE=false (Production):**
-- Uses Supabase Auth `signInWithOtp()`
-- Actual emails sent via Supabase SMTP
+- Uses MONGODB Auth `signInWithOtp()`
+- Actual emails sent via MONGODB SMTP
 - OTP code NOT returned in response
 - Must check email for code
 
@@ -452,7 +452,7 @@ export async function sendAppointmentConfirmation(to, details) {
 export async function sendOTP(email) {
   // Generate and store OTP
   // Dev mode: return code
-  // Prod mode: send via Supabase Auth
+  // Prod mode: send via MONGODB Auth
 }
 
 export async function verifyOTP(email, code) {
@@ -466,38 +466,38 @@ export async function verifyOTP(email, code) {
 
 ## Database Access
 
-### Supabase Client
+### MONGODB Client
 ```javascript
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'mongoose + MongoDB API client';
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+export const MONGODB = createClient(
+  process.env.MONGODB_URL,
+  process.env.MONGODB_ANON_KEY
 );
 
-export const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+export const MONGODBAdmin = createClient(
+  process.env.MONGODB_URL,
+  process.env.MONGODB_SERVICE_ROLE_KEY
 );
 ```
 
 **Usage:**
 ```javascript
 // Insert
-const { data, error } = await supabaseAdmin
+const { data, error } = await MONGODBAdmin
   .from('users')
   .insert({ email, role: 'patient' })
   .select()
   .single();
 
 // Query
-const { data, error } = await supabaseAdmin
+const { data, error } = await MONGODBAdmin
   .from('appointments')
   .select('*, doctor:doctors(*)')
   .eq('patient_id', userId);
 
 // Update
-const { error } = await supabaseAdmin
+const { error } = await MONGODBAdmin
   .from('appointments')
   .update({ status: 'completed' })
   .eq('id', appointmentId);
@@ -582,7 +582,7 @@ curl -X POST http://localhost:5000/api/auth/verify-otp \
 ### Production
 ```json
 {
-  "@supabase/supabase-js": "^2.105.4",
+  "mongoose + MongoDB API client": "^2.105.4",
   "express": "^4.18.2",
   "resend": "^6.12.4",
   "jsonwebtoken": "^9.0.2",
@@ -600,7 +600,7 @@ curl -X POST http://localhost:5000/api/auth/verify-otp \
 - ✅ Compression middleware
 - ✅ Response caching (where appropriate)
 - ✅ Database indexing
-- ✅ Connection pooling (Supabase)
+- ✅ Connection pooling (MONGODB)
 
 ---
 

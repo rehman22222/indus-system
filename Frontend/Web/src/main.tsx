@@ -2,17 +2,15 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Suppress Supabase-network errors in console — they are expected when
-// VITE_SUPABASE_URL is unset/dead and the app falls back to mock data.
+// Suppress backend-network errors in console during local development.
 // We can't stop the browser from logging the underlying failed fetch /
 // WebSocket connect (those happen below the JS layer), but we can silence
 // the app-level console.error / console.warn that pile on top.
-const SUPABASE_NOISE_PATTERNS = [
+const MongoDB_NOISE_PATTERNS = [
     'ERR_NAME_NOT_RESOLVED',
-    'supabase.co',
-    'SUPABASE_UNREACHABLE',
-    'SUPABASE_NOT_CONFIGURED',
-    'SUPABASE_SCHEMA_MISSING',
+    'MongoDB_UNREACHABLE',
+    'MongoDB_NOT_CONFIGURED',
+    'MongoDB_SCHEMA_MISSING',
     'Failed to fetch',
     'NetworkError',
     // PostgREST error codes / messages — surface when the project schema
@@ -40,9 +38,9 @@ function flatten(arg: unknown): string {
     return String(arg);
 }
 
-function isSupabaseNoise(args: unknown[]): boolean {
+function isMongoDBNoise(args: unknown[]): boolean {
     const flat = args.map(flatten).join(' ');
-    return SUPABASE_NOISE_PATTERNS.some((p) => flat.includes(p));
+    return MongoDB_NOISE_PATTERNS.some((p) => flat.includes(p));
 }
 
 // Only mute in development. In production we leave console.error/warn intact so
@@ -50,13 +48,13 @@ function isSupabaseNoise(args: unknown[]): boolean {
 if (import.meta.env.DEV) {
     const originalConsoleError = console.error;
     console.error = (...args: unknown[]) => {
-        if (isSupabaseNoise(args)) return;
+        if (isMongoDBNoise(args)) return;
         originalConsoleError.apply(console, args as never[]);
     };
 
     const originalConsoleWarn = console.warn;
     console.warn = (...args: unknown[]) => {
-        if (isSupabaseNoise(args)) return;
+        if (isMongoDBNoise(args)) return;
         originalConsoleWarn.apply(console, args as never[]);
     };
 }

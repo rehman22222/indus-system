@@ -62,8 +62,8 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Network-first strategy for API calls (Supabase, Edge Functions)
-    if (url.hostname.includes('supabase') || url.pathname.startsWith('/api/')) {
+    // Network-first strategy for backend API calls.
+    if (url.pathname.startsWith('/api/')) {
         event.respondWith(
             fetch(request)
                 .then((response) => {

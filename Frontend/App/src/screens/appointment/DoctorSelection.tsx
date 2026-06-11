@@ -1,10 +1,23 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDoctors } from '../../hooks/useDoctors';
+import type { DoctorWithName } from '../../hooks/useDoctors';
 import { colors, radius, spacing } from '../../lib/theme';
 
-const DoctorSelectionScreen = ({ route, navigation }) => {
-  const { specialtyId, specialtyName, patientId, userId } = route.params;
+type DoctorSelectionProps = {
+  route?: {
+    params: {
+      specialtyId?: string;
+      specialtyName?: string;
+      patientId?: string;
+      userId?: string;
+    };
+  };
+  navigation?: any;
+};
+
+const DoctorSelectionScreen = ({ route, navigation }: DoctorSelectionProps) => {
+  const { specialtyId, specialtyName, patientId, userId } = route?.params || {};
   const { doctors, isLoading } = useDoctors();
 
   const filteredDoctors = specialtyId
@@ -15,7 +28,7 @@ const DoctorSelectionScreen = ({ route, navigation }) => {
       )
     : doctors;
 
-  const onSelectDoctor = (doctor) => {
+  const onSelectDoctor = (doctor: DoctorWithName) => {
     navigation.navigate('SlotSelection', { 
       doctorId: doctor.id,
       doctorName: doctor.name,
@@ -25,7 +38,7 @@ const DoctorSelectionScreen = ({ route, navigation }) => {
     });
   };
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item }: { item: DoctorWithName }) => (
     <TouchableOpacity style={styles.item} onPress={() => onSelectDoctor(item)}>
       <View style={styles.itemContent}>
         <View style={styles.avatarPlaceholder}>

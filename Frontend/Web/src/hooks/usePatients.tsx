@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { safeQuery } from '@/lib/safeQuery';
-import { PATIENT_DETAIL_SELECT } from '@/integrations/supabase/queries';
-import type { Patient } from '@/integrations/supabase/types';
+import { PATIENT_DETAIL_SELECT } from '@/integrations/mongodb/queries';
+import type { Patient } from '@/integrations/mongodb/types';
 
 // PatientWithLegacyAlias: many components were written against an older
 // shape that exposed `name`, `patient_id`, `age`, and `gender`. Surface
@@ -58,7 +58,7 @@ export function usePatientByUserId(userId: string | undefined) {
       try {
         setIsLoading(true);
         const data = await safeQuery(
-          () => supabase
+          () => MongoDB
             .from('patients')
             .select(PATIENT_DETAIL_SELECT)
             .eq('user_id', userId)
@@ -83,7 +83,7 @@ export function usePatientByUserId(userId: string | undefined) {
     if (!patient) return { error: new Error('No patient loaded') };
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .update(updates)
         .eq('id', patient.id)
@@ -106,9 +106,9 @@ const AUTH_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Resolve the signed-in patient for the real-Supabase-session model.
+ * Resolve the signed-in patient for the real-MongoDB-session model.
  *
- * Patients now have a persisted Supabase session, so `user.id` is a
+ * Patients now have a persisted MongoDB session, so `user.id` is a
  * real auth uuid that matches `patients.user_id`. We still fall back to
  * an email match so rows created earlier (when only `patients.email`
  * was written) keep resolving. Pass the auth user object directly.
@@ -138,7 +138,7 @@ export function usePatientByAuth(
       // 1. Real session → match the auth uuid.
       if (uid && AUTH_UUID_RE.test(uid)) {
         row = (await safeQuery(
-          () => supabase
+          () => MongoDB
             .from('patients')
             .select(PATIENT_DETAIL_SELECT)
             .eq('user_id', uid)
@@ -149,7 +149,7 @@ export function usePatientByAuth(
       // 2. Legacy / fallback → match by email.
       if (!row && email) {
         row = (await safeQuery(
-          () => supabase
+          () => MongoDB
             .from('patients')
             .select(PATIENT_DETAIL_SELECT)
             .ilike('email', email)
@@ -175,7 +175,7 @@ export function usePatientByAuth(
   const updatePatient = async (updates: Partial<Patient>) => {
     if (!patient) return { error: new Error('No patient loaded') };
     try {
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .update(updates)
         .eq('id', patient.id)
@@ -219,7 +219,7 @@ export function usePatientByEmail(email: string | undefined) {
       try {
         setIsLoading(true);
         const data = await safeQuery(
-          () => supabase
+          () => MongoDB
             .from('patients')
             .select(PATIENT_DETAIL_SELECT)
             .ilike('email', email)
@@ -244,7 +244,7 @@ export function usePatientByEmail(email: string | undefined) {
     if (!patient) return { error: new Error('No patient loaded') };
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .update(updates)
         .eq('id', patient.id)
@@ -297,7 +297,7 @@ export function useCreatePatient() {
         patientData.email ||
         (UUID_RE.test(patientData.user_id) ? undefined : patientData.user_id);
 
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .insert({
           user_id: realUserId,

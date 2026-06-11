@@ -18,7 +18,7 @@ module.exports = (env, argv) => {
     
     console.log('--- Webpack Build Config ---');
     console.log('Mode:', isProduction ? 'production' : 'development');
-    console.log('VITE_SUPABASE_URL:', process.env.VITE_SUPABASE_URL ? 'PRESENT' : 'MISSING');
+    console.log('VITE_API_BASE_URL:', process.env.VITE_API_BASE_URL || process.env.VITE_API_URL || 'http://localhost:5000');
     console.log('----------------------------');
 
     // Prepare environment variables for DefinePlugin
@@ -29,16 +29,14 @@ module.exports = (env, argv) => {
             MODE: isProduction ? 'production' : 'development',
             DEV: !isProduction,
             PROD: isProduction,
-            VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
-            VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
-            VITE_API_URL: process.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+            VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || process.env.VITE_API_URL || 'http://localhost:5000',
+            VITE_API_URL: process.env.VITE_API_URL || process.env.VITE_API_BASE_URL || 'http://localhost:5000',
         }),
         'import.meta.env.MODE': JSON.stringify(isProduction ? 'production' : 'development'),
         'import.meta.env.DEV': JSON.stringify(!isProduction),
         'import.meta.env.PROD': JSON.stringify(isProduction),
-        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
-        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
-        'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:8000/api/v1'),
+        'import.meta.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || process.env.VITE_API_URL || 'http://localhost:5000'),
+        'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || process.env.VITE_API_BASE_URL || 'http://localhost:5000'),
     };
 
     return {

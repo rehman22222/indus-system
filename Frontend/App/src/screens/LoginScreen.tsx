@@ -5,7 +5,7 @@
 //   login ─"create account"─▶ signup ─submit─▶ otp ─▶ success ─▶ login
 //   login ─"forgot password"─▶ forgot ─submit─▶ forgotOtp ─▶ success ─▶ login
 //
-// • Patients: real Supabase email/password. A 6-digit email OTP (the
+// • Patients: real MongoDB email/password. A 6-digit email OTP (the
 //   {{ .Token }} email template) verifies signup and gates password
 //   reset. Verified patients are mirrored into the in-memory authStore
 //   as PATIENT so existing routing keeps working.
@@ -29,7 +29,7 @@ import {
   Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle2,
 } from 'lucide-react';
 import { authStore } from '../auth/authStore';
-import { supabase } from '../integrations/supabase/client';
+import { MongoDB } from '../integrations/mongodb/client';
 import { colors, radius, spacing } from '../lib/theme';
 
 type Step = 'login' | 'signup' | 'otp' | 'forgot' | 'forgotOtp' | 'success';
@@ -77,8 +77,7 @@ function errMessage(e: unknown, fallback: string): string {
 }
 
 function routeForRole(navigation: any, role: string) {
-  if (role === 'DOCTOR') navigation.replace('DoctorDashboard');
-  else navigation.replace('PatientDashboard');
+  if (role === 'PATIENT') navigation.replace('PatientDashboard');
 }
 
 // ---------- shared bits ----------
@@ -254,7 +253,7 @@ const LoginScreen = ({ navigation }: { navigation: any }) => {
           </View>
 
           {step === 'login' && (
-            <Text style={styles.demoLine}>Staff demo login — Admin@gmail.com · password 123456</Text>
+            <Text style={styles.demoLine}>Patient demo login - patient1@example.com - password 123456</Text>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -287,30 +286,30 @@ function LoginView({
 
     setSubmitting(true);
     try {
-      // 1. Patients: real Supabase email/password.
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Patients: real MongoDB email/password. Staff use the web portal.
+      const { data, error } = await MongoDB.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (!error && data.user) {
-        const fullName =
-          (data.user.user_metadata?.full_name as string | undefined) ?? '';
-        authStore.syncPatientAccount(email.trim(), password, fullName);
-        authStore.login(email.trim(), password);
-        onAuthed('PATIENT');
+        const role = String(data.user.role || 'PATIENT').toUpperCase();
+        if (role === 'PATIENT') {
+          const fullName =
+            (data.user.user_metadata?.full_name as string | undefined) ||
+            data.user.name ||
+            '';
+          authStore.syncPatientAccount(email.trim(), password, fullName);
+          authStore.login(email.trim(), password);
+          onAuthed(role);
+          return;
+        }
+        await MongoDB.auth.signOut();
+        setFormError('This mobile app is for patients only. Doctor, admin, and management users should use the web portal.');
         return;
       }
 
-      // 2. Staff fall back to the in-memory store.
-      const staff = authStore.login(email.trim(), password);
-      if ('error' in staff) {
-        setFormError(
-          error ? errMessage(error, 'Invalid email or password.') : staff.error,
-        );
-        return;
-      }
-      onAuthed(staff.user.role);
+      setFormError(error ? errMessage(error, 'Invalid email or password.') : 'Invalid email or password.');
     } catch (err) {
       setFormError(errMessage(err, 'Login failed. Please try again.'));
     } finally {
@@ -322,7 +321,7 @@ function LoginView({
     <View>
       <View style={styles.center}>
         <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+        <Text style={styles.subtitle}>Patient access only</Text>
       </View>
 
       <FormError msg={formError} />
@@ -421,7 +420,7 @@ function SignupView({
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await MongoDB.auth.signUp({
         email,
         password: values.password,
         options: {
@@ -593,14 +592,14 @@ function SignupOtpView({
     }
     setSubmitting(true);
     try {
-      const { error: vErr } = await supabase.auth.verifyOtp({
+      const { error: vErr } = await MongoDB.auth.verifyOtp({
         email, token: code, type: 'signup',
       });
       if (vErr) {
         setError(errMessage(vErr, 'Incorrect or expired code.'));
         return;
       }
-      await supabase.auth.signOut();
+      await MongoDB.auth.signOut();
       authStore.syncPatientAccount(email, password, fullName);
       onVerified();
     } catch (err) {
@@ -612,7 +611,7 @@ function SignupOtpView({
 
   const resend = async () => {
     setError('');
-    const { error: rErr } = await supabase.auth.resend({ type: 'signup', email });
+    const { error: rErr } = await MongoDB.auth.resend({ type: 'signup', email });
     if (rErr) {
       setError(errMessage(rErr, 'Could not resend the code.'));
       return;
@@ -681,7 +680,7 @@ function ForgotView({
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await MongoDB.auth.resetPasswordForEmail(email.trim());
       if (error) {
         setFormError(errMessage(error, 'Could not send the reset code.'));
         return;
@@ -769,20 +768,20 @@ function ForgotOtpView({
     setError('');
     setSubmitting(true);
     try {
-      const { error: vErr } = await supabase.auth.verifyOtp({
+      const { error: vErr } = await MongoDB.auth.verifyOtp({
         email, token: code, type: 'recovery',
       });
       if (vErr) {
         setError(errMessage(vErr, 'Incorrect or expired code.'));
         return;
       }
-      const { error: uErr } = await supabase.auth.updateUser({ password });
+      const { error: uErr } = await MongoDB.auth.updateUser({ password });
       if (uErr) {
         setError(errMessage(uErr, 'Could not update the password.'));
         return;
       }
       authStore.syncPatientAccount(email, password, '');
-      await supabase.auth.signOut();
+      await MongoDB.auth.signOut();
       onReset();
     } catch (err) {
       setError(errMessage(err, 'Password reset failed.'));

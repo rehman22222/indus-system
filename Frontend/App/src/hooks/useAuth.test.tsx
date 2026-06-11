@@ -1,13 +1,13 @@
 
 import { renderHook, act } from '@testing-library/react-hooks';
 import { AuthProvider, useAuth } from './useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { vi } from 'vitest';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User } from '@/integrations/mongodb/client';
 
-// Mock the entire supabase client to prevent real API calls
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
+// Mock the entire MongoDB client to prevent real API calls
+vi.mock('@/integrations/mongodb/client', () => ({
+  MongoDB: {
     auth: {
       onAuthStateChange: vi.fn(),
       getSession: vi.fn(),
@@ -41,10 +41,10 @@ describe('useAuth Hook', () => {
     vi.clearAllMocks();
 
     // Mock getSession to return no initial session, simulating a fresh load
-    (supabase.auth.getSession as vi.Mock).mockResolvedValue({ data: { session: null } });
+    (MongoDB.auth.getSession as vi.Mock).mockResolvedValue({ data: { session: null } });
 
     // Mock onAuthStateChange to capture the callback passed from the hook
-    (supabase.auth.onAuthStateChange as vi.Mock).mockImplementation((_event, callback) => {
+    (MongoDB.auth.onAuthStateChange as vi.Mock).mockImplementation((_event, callback) => {
       onAuthStateChangeCallback = callback;
       return {
         data: { subscription: { unsubscribe: vi.fn() } },
@@ -57,7 +57,7 @@ describe('useAuth Hook', () => {
     const mockUser = { id: 'doc-123', email: 'doctor@example.com' } as User;
     const mockSession = { user: mockUser } as Session;
     // Mock the database call to return the doctor role from public.users
-    ((supabase.from as vi.Mock)('users').select().eq().maybeSingle as vi.Mock).mockResolvedValue({ data: { role: 'DOCTOR' }, error: null });
+    ((MongoDB.from as vi.Mock)('users').select().eq().maybeSingle as vi.Mock).mockResolvedValue({ data: { role: 'DOCTOR' }, error: null });
 
     // Act: Render the hook
     const { result, waitFor } = renderHook(() => useAuth(), { wrapper: AuthProvider });
@@ -88,7 +88,7 @@ describe('useAuth Hook', () => {
     const mockUser = { id: 'patient-456', email: 'patient@example.com' } as User;
     const mockSession = { user: mockUser } as Session;
     // Mock the database call to return the patient role from public.users
-    ((supabase.from as vi.Mock)('users').select().eq().maybeSingle as vi.Mock).mockResolvedValue({ data: { role: 'PATIENT' }, error: null });
+    ((MongoDB.from as vi.Mock)('users').select().eq().maybeSingle as vi.Mock).mockResolvedValue({ data: { role: 'PATIENT' }, error: null });
 
     // Act
     const { result, waitFor } = renderHook(() => useAuth(), { wrapper: AuthProvider });

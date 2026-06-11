@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, query } from 'express-validator';
+import { body } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
@@ -22,18 +22,7 @@ const router = express.Router();
 router.get(
     '/',
     authMiddleware,
-    requireRole(['admin', 'management']),
     asyncHandler(getAllAppointments)
-);
-
-/**
- * GET /api/v1/appointments/:id
- * Get appointment by ID
- */
-router.get(
-    '/:id',
-    authMiddleware,
-    asyncHandler(getAppointmentById)
 );
 
 /**
@@ -44,13 +33,15 @@ router.post(
     '/',
     authMiddleware,
     [
-        body('patientId').notEmpty().withMessage('Patient ID is required'),
-        body('doctorId').notEmpty().withMessage('Doctor ID is required'),
-        body('departmentId').notEmpty().withMessage('Department ID is required'),
-        body('slotId').notEmpty().withMessage('Slot ID is required'),
-        body('date').notEmpty().isISO8601().withMessage('Valid date is required'),
-        body('time').notEmpty().withMessage('Time is required'),
+        body().custom((_, { req }) => {
+            if (!req.body.patientId && !req.body.patient_id) throw new Error('Patient ID is required');
+            if (!req.body.doctorId && !req.body.doctor_id) throw new Error('Doctor ID is required');
+            if (!req.body.date && !req.body.appointment_date) throw new Error('Valid date is required');
+            if (!req.body.time && !req.body.appointment_time) throw new Error('Time is required');
+            return true;
+        }),
         body('chiefComplaint').optional().isString(),
+        body('chief_complaint').optional().isString(),
         validate
     ],
     asyncHandler(createAppointment)
@@ -94,6 +85,16 @@ router.get(
     '/doctor/:doctorId',
     authMiddleware,
     asyncHandler(getDoctorAppointments)
+);
+
+/**
+ * GET /api/v1/appointments/:id
+ * Get appointment by ID
+ */
+router.get(
+    '/:id',
+    authMiddleware,
+    asyncHandler(getAppointmentById)
 );
 
 export default router;

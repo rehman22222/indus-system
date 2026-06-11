@@ -2,10 +2,12 @@
 
 This document lists API-related environment variables. Secrets are redacted; keep real values in the .env file.
 
-## Supabase
-- SUPABASE_URL: https://vlcbwrfydjjnsjtuismw.supabase.co
-- SUPABASE_ANON_KEY: <redacted>
-- SUPABASE_SERVICE_ROLE_KEY: <redacted>
+## MongoDB Atlas
+- MONGODB_URI: <redacted>
+- MONGODB_DB_NAME: doctorappointment
+
+MongoDB credentials are backend/analytics secrets only. Do not add MongoDB URI,
+database users, or database passwords to web/mobile frontend env files.
 
 ## Daily.co Video
 - DAILY_API_URL: https://api.daily.co/v1
@@ -30,4 +32,13 @@ This document lists API-related environment variables. Secrets are redacted; kee
 - ANALYTICS_API_URL: http://localhost:8000
 
 ## CORS
-- CORS_ORIGIN: http://localhost:3000,http://localhost:5173
+- CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:3001
+
+## Native Expo Mobile App
+- EXPO_PUBLIC_API_BASE_URL: https://api.your-domain.com
+- EXPO_PUBLIC_APP_NAME: Indus Hospital
+- EAS_PROJECT_ID: <configured after `eas init`>
+- EXPO_UPDATE_URL: <configured after EAS Update>
+
+Native mobile env values with `EXPO_PUBLIC_` are public. Keep Daily.co,
+Resend, Firebase Admin, JWT, OTP, and MongoDB secrets in backend env only.

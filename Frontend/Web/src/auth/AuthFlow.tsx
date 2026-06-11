@@ -11,22 +11,22 @@ import { Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ArrowLeft } from 'luci
 import { cn } from '@/lib/utils';
 import indusLogo from '@/assets/indus-logo.svg';
 import { authStore } from './authStore';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { useOTP } from '@/hooks/useOTP';
 import { OTPInput } from '@/components/OTPInput';
 import { roleFromEmail } from '@/lib/roleFromEmail';
 
 // =================================================================
-// AuthFlow — PATIENT self-service auth on real Supabase Auth, plus a
-// fallback to the in-memory authStore for STAFF (who have no Supabase
+// AuthFlow — PATIENT self-service auth on real MongoDB Auth, plus a
+// fallback to the in-memory authStore for STAFF (who have no MongoDB
 // account).
 //
-//   login (password) ──────────────▶ Supabase signInWithPassword
+//   login (password) ──────────────▶ MongoDB signInWithPassword
 //        │  └─ staff fallback ─────▶ authStore.login
 //        ├─"create account"─▶ signup ─▶ signUp ─▶ otp ─▶ success ─▶ login
 //        └─"forgot password"─▶ forgot ─▶ otp ─▶ updateUser ─▶ success
 //
-// Patients get a real persisted Supabase session — no authStore mirror.
+// Patients get a real persisted MongoDB session — no authStore mirror.
 // AuthGate observes the session and routes automatically.
 // =================================================================
 
@@ -39,7 +39,7 @@ type Step =
   | 'success';
 
 // Signup payload collected at the form step and carried through the
-// custom-OTP step, where the real Supabase account is finally created.
+// custom-OTP step, where the real MongoDB account is finally created.
 interface PendingSignup {
   email: string;
   password: string;
@@ -218,7 +218,7 @@ export function AuthFlow() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Staff demo login — Admin@gmail.com · password 123456
+          Web portal demo login - admin@gmail.com - password 123456
         </p>
       </div>
     </div>
@@ -252,8 +252,8 @@ function LoginView({
 
     setSubmitting(true);
     try {
-      // 1. Patients → real Supabase session (persisted; AuthGate routes).
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 1. Patients → real MongoDB session (persisted; AuthGate routes).
+      const { data, error } = await MongoDB.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -262,7 +262,7 @@ function LoginView({
         return; // onAuthStateChange + AuthGate take over.
       }
 
-      // 2. Staff have no Supabase account → in-memory authStore.
+      // 2. Staff have no MongoDB account → in-memory authStore.
       const staff = authStore.login(email.trim(), password);
       if ('error' in staff) {
         setFormError(
@@ -333,10 +333,7 @@ function LoginView({
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        New patient?{' '}
-        <button type="button" onClick={onSignup} className="text-primary font-medium hover:underline">
-          Create an account
-        </button>
+        Patient accounts are created and used from the mobile app.
       </p>
     </form>
   );
@@ -391,7 +388,7 @@ function SignupView({
 
     setSubmitting(true);
     try {
-      // Email confirmation is disabled in Supabase; verify the email via
+      // Email confirmation is disabled in MongoDB; verify the email via
       // our custom OTP first. The real account is only created in
       // SignupOtpView once the code is confirmed.
       const result = await sendOTP(email, fullName);
@@ -617,7 +614,7 @@ function SignupOtpView({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(60);
-  // True when the final supabase.auth.signUp reports the email is
+  // True when the final MongoDB.auth.signUp reports the email is
   // already in auth.users — in that case the only path forward is to
   // log in (no further OTP retries will help).
   const [alreadyExists, setAlreadyExists] = useState(false);
@@ -648,11 +645,11 @@ function SignupOtpView({
           return;
         }
 
-        // 2. Email verified — now create the real Supabase account.
+        // 2. Email verified — now create the real MongoDB account.
         // (Email confirmation is disabled, so this returns a session
         // immediately and AuthGate routes the patient to their
         // dashboard.)
-        const { error: suErr } = await supabase.auth.signUp({
+        const { error: suErr } = await MongoDB.auth.signUp({
           email: signup.email,
           password: signup.password,
           options: {
@@ -791,7 +788,7 @@ function ForgotView({
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await MongoDB.auth.resetPasswordForEmail(email.trim());
       if (error) {
         setFormError(errMessage(error, 'Could not send the reset code.'));
         return;
@@ -883,7 +880,7 @@ function ForgotOtpView({
     setError('');
     setSubmitting(true);
     try {
-      const { error: vErr } = await supabase.auth.verifyOtp({
+      const { error: vErr } = await MongoDB.auth.verifyOtp({
         email,
         token: code,
         type: 'recovery',
@@ -892,13 +889,13 @@ function ForgotOtpView({
         setError(errMessage(vErr, 'Incorrect or expired code.'));
         return;
       }
-      const { error: uErr } = await supabase.auth.updateUser({ password });
+      const { error: uErr } = await MongoDB.auth.updateUser({ password });
       if (uErr) {
         setError(errMessage(uErr, 'Could not update the password.'));
         return;
       }
       // End the recovery session so the patient signs in fresh.
-      await supabase.auth.signOut();
+      await MongoDB.auth.signOut();
       onReset();
     } catch (err) {
       setError(errMessage(err, 'Password reset failed.'));

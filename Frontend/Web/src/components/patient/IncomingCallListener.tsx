@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel } from '@/integrations/mongodb/client';
 import { Button } from '@/components/ui/button';
 import { Phone, PhoneOff, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { inviteChannelName, type CallInvitePayload } from '@/lib/callInvite';
 
 /**
@@ -25,7 +25,7 @@ export function IncomingCallListener({
 
   useEffect(() => {
     if (!userId) return;
-    const ch = supabase.channel(inviteChannelName(userId));
+    const ch = MongoDB.channel(inviteChannelName(userId));
     channelRef.current = ch;
     ch.on('broadcast', { event: 'call-invite' }, ({ payload }) => {
       setInvite(payload as CallInvitePayload);
@@ -33,7 +33,7 @@ export function IncomingCallListener({
     }).subscribe();
 
     return () => {
-      supabase.removeChannel(ch);
+      MongoDB.removeChannel(ch);
       channelRef.current = null;
     };
   }, [userId]);

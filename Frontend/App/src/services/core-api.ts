@@ -1,5 +1,5 @@
 // Core API service for the mobile app
-// Connects to Supabase Edge Functions and centralized backend services
+// Connects to MongoDB Edge Functions and centralized backend services
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -95,7 +95,7 @@ export class SocketService {
     }
 
     static on(event: string, callback: Function) {
-        // Wire to real Socket.io or Supabase Realtime
+        // Wire to real Socket.io or MongoDB Realtime
         console.log(`[SocketService] Listening to ${event}`);
     }
 

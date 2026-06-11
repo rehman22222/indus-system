@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useAvailableSlots } from '../../hooks/useSlots';
+import type { AvailableSlot } from '../../hooks/useSlots';
 import { format, addDays, isSameDay } from 'date-fns';
 import { colors, radius, spacing } from '../../lib/theme';
 
-const SlotSelectionScreen = ({ route, navigation }) => {
-  const { doctorId, doctorName, doctorSpecialty, patientId, userId } = route.params;
+type SlotSelectionProps = {
+  route?: {
+    params: {
+      doctorId: string;
+      doctorName: string;
+      doctorSpecialty: string;
+      patientId?: string;
+      userId?: string;
+    };
+  };
+  navigation?: any;
+};
+
+const SlotSelectionScreen = ({ route, navigation }: SlotSelectionProps) => {
+  const { doctorId = '', doctorName = '', doctorSpecialty = '', patientId, userId } = route?.params || {};
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { slots, isLoading, fetchSlots } = useAvailableSlots();
 
@@ -16,7 +30,7 @@ const SlotSelectionScreen = ({ route, navigation }) => {
     fetchSlots(doctorId, dateStr);
   }, [doctorId, selectedDate, fetchSlots]);
 
-  const onSelectSlot = (slot) => {
+  const onSelectSlot = (slot: AvailableSlot) => {
     navigation.navigate('Confirmation', { 
       doctorId, 
       doctorName,

@@ -1,150 +1,253 @@
-import admin from 'firebase-admin';
-import { supabaseAdmin } from '../config/supabase.js';
+import { Notification, User } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { requireObjectId, serialize } from '../utils/mongo.js';
+import { buildListFilter, buildProjection, buildSort, getListOptions, pagedFind } from '../utils/api.js';
+import { invalidateCache } from '../services/cache.service.js';
+import { isPushReady } from '../services/push.service.js';
+import { enqueueNotification } from '../services/notificationQueue.service.js';
 
-// Initialize Firebase Admin (only once)
-let firebaseInitialized = false;
+function fcmTokenFor(user) {
+    return user?.fcm_token || user?.push_tokens?.find((item) => item.provider === 'fcm' && item.token)?.token;
+}
 
-const initializeFirebase = () => {
-    if (!firebaseInitialized && process.env.FCM_PROJECT_ID && process.env.FCM_PRIVATE_KEY) {
-        try {
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: process.env.FCM_PROJECT_ID,
-                    clientEmail: process.env.FCM_CLIENT_EMAIL,
-                    privateKey: process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n')
-                })
-            });
-            firebaseInitialized = true;
-            console.log('✅ Firebase Admin initialized');
-        } catch (error) {
-            console.warn('⚠️  Firebase Admin initialization failed (FCM disabled)');
+const FIELD_MAP = {
+    is_read: 'read',
+    userId: 'user_id',
+    user_id: 'user_id',
+};
+
+function serializeNotification(row) {
+    const value = serialize(row);
+    return {
+        ...value,
+        message: value.body,
+        type: value.data?.type || 'info',
+        is_read: Boolean(value.read),
+    };
+}
+
+function serializeNotifications(rows = []) {
+    return rows.map(serializeNotification);
+}
+
+export const listNotifications = async (req, res) => {
+    const list = getListOptions(req.query);
+    const filter = buildListFilter(req, { fieldMap: FIELD_MAP });
+
+    if (req.userRole === 'patient' || req.userRole === 'doctor') {
+        filter.user_id = requireObjectId(req.user.id, 'userId');
+    } else if (req.query.user_id || req.query.userId) {
+        filter.user_id = requireObjectId(req.query.user_id || req.query.userId, 'userId');
+    }
+
+    if (req.query.read !== undefined) filter.read = req.query.read === 'true';
+    if (req.query.is_read !== undefined) filter.read = req.query.is_read === 'true';
+
+    const sort = buildSort(req.query, {
+        fieldMap: FIELD_MAP,
+        allowed: ['created_at', 'sent_at', 'read', 'user_id'],
+        fallback: { created_at: -1 },
+    });
+    const projection = buildProjection(req.query, [
+        '_id',
+        'id',
+        'user_id',
+        'title',
+        'body',
+        'data',
+        'read',
+        'sent_at',
+        'read_at',
+        'created_at',
+        'updated_at',
+    ], FIELD_MAP);
+
+    const { items, pagination } = await pagedFind(Notification, filter, {
+        ...list,
+        sort,
+        projection,
+        maxTimeMS: 5000,
+    });
+
+    const notifications = serializeNotifications(items);
+    res.status(200).json({ notifications, data: notifications, pagination });
+};
+
+export const updateNotification = async (req, res) => {
+    const id = requireObjectId(req.params.id, 'notificationId');
+    const filter = { _id: id };
+    if (req.userRole === 'patient' || req.userRole === 'doctor') {
+        filter.user_id = requireObjectId(req.user.id, 'userId');
+    }
+
+    const updates = { ...req.body };
+    if ('is_read' in updates) {
+        updates.read = Boolean(updates.is_read);
+        delete updates.is_read;
+    }
+    if (updates.read === true && !updates.read_at) updates.read_at = new Date();
+
+    const notification = await Notification.findOneAndUpdate(filter, updates, {
+        new: true,
+        runValidators: true,
+    });
+
+    if (!notification) throw new AppError('Notification not found', 404);
+    await invalidateCache(['notifications:*', 'dashboard:*']);
+
+    const data = serializeNotification(notification);
+    res.status(200).json({ notification: data, data });
+};
+
+export const createNotification = async (req, res) => {
+    const rows = Array.isArray(req.body) ? req.body : [req.body];
+    if (rows.length === 0) throw new AppError('Notification payload is required', 400);
+
+    const payload = rows.map((row) => ({
+        user_id: requireObjectId(row.userId || row.user_id, 'userId'),
+        title: row.title,
+        body: row.body || row.message,
+        data: row.data || {},
+        read: Boolean(row.read ?? row.is_read ?? false),
+        sent_at: row.sent_at ? new Date(row.sent_at) : new Date(),
+    }));
+
+    for (const row of payload) {
+        if (!row.title || !row.body) {
+            throw new AppError('Notification title and body are required', 400);
         }
-    } else if (!firebaseInitialized) {
-        console.log('ℹ️  Firebase Cloud Messaging disabled (no credentials)');
     }
+
+    const notifications = await Notification.insertMany(payload, { ordered: true });
+    await invalidateCache(['notifications:*', 'dashboard:*']);
+
+    const data = serializeNotifications(notifications);
+    res.status(201).json({
+        notifications: data,
+        notification: data[0] || null,
+        data: Array.isArray(req.body) ? data : data[0] || null,
+    });
 };
 
-initializeFirebase();
+export const registerDeviceToken = async (req, res) => {
+    const token = String(req.body.token || req.body.fcm_token || req.body.device_token || '').trim();
+    if (!token) throw new AppError('Device token is required', 400);
 
-/**
- * Send push notification to a single user
- */
+    const providerInput = String(req.body.provider || req.body.type || 'unknown').toLowerCase();
+    const platformInput = String(req.body.platform || 'unknown').toLowerCase();
+    const provider = ['fcm', 'apns', 'expo'].includes(providerInput) ? providerInput : 'unknown';
+    const platform = ['android', 'ios', 'web'].includes(platformInput) ? platformInput : 'unknown';
+    const deviceName = req.body.deviceName || req.body.device_name;
+    const now = new Date();
+
+    const user = await User.findById(req.user.id).select('fcm_token push_tokens');
+    if (!user) throw new AppError('User not found', 404);
+
+    const existingTokens = Array.isArray(user.push_tokens)
+        ? user.push_tokens.filter((item) => item.token !== token)
+        : [];
+
+    user.push_tokens = [
+        {
+            token,
+            provider,
+            platform,
+            device_name: deviceName,
+            last_seen_at: now,
+            created_at: now,
+        },
+        ...existingTokens,
+    ].slice(0, 10);
+
+    if (provider === 'fcm') {
+        user.fcm_token = token;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+        message: 'Device token registered successfully',
+        data: {
+            provider,
+            platform,
+            registered: true,
+        },
+    });
+};
+
 export const sendNotification = async (req, res) => {
-    const { userId, title, body, data = {} } = req.body;
+    const userId = requireObjectId(req.body.userId || req.body.user_id, 'userId');
+    const { title, body, data = {} } = req.body;
 
-    // Get user's FCM token
-    const { data: user, error: userError } = await supabaseAdmin
-        .from('users')
-        .select('fcm_token')
-        .eq('id', userId)
-        .single();
-
-    if (userError || !user || !user.fcm_token) {
-        throw new AppError('User not found or FCM token not available', 404);
+    if (!title || !body) {
+        throw new AppError('Notification title and body are required', 400);
     }
 
-    try {
-        // Send notification via FCM
-        const message = {
-            notification: {
-                title,
-                body
-            },
-            data: {
-                ...data,
-                timestamp: new Date().toISOString()
-            },
-            token: user.fcm_token
-        };
+    const user = await User.findById(userId).select('fcm_token push_tokens');
+    if (!user) throw new AppError('User not found', 404);
 
-        const response = await admin.messaging().send(message);
+    const fcmToken = fcmTokenFor(user);
 
-        // Log notification to database
-        await supabaseAdmin
-            .from('notifications')
-            .insert({
-                user_id: userId,
-                title,
-                body,
-                data,
-                sent_at: new Date().toISOString(),
-                fcm_message_id: response
-            });
+    // Persist the in-app notification immediately (always visible in the UI).
+    const notification = await Notification.create({
+        user_id: userId,
+        title,
+        body,
+        data,
+        sent_at: new Date(),
+    });
+    await invalidateCache(['notifications:*', 'dashboard:*']);
 
-        res.status(200).json({
-            message: 'Notification sent successfully',
-            messageId: response
+    // Push delivery happens asynchronously via the worker queue.
+    const willPush = Boolean(fcmToken) && isPushReady();
+    if (willPush) {
+        await enqueueNotification({
+            type: 'push',
+            token: fcmToken,
+            title,
+            body,
+            data,
+            notificationId: notification._id.toString(),
         });
-    } catch (error) {
-        console.error('Error sending notification:', error);
-        throw new AppError('Failed to send notification', 500);
     }
+
+    res.status(202).json({
+        message: 'Notification queued',
+        data: serialize(notification),
+        delivery: willPush ? 'queued' : 'stored_only',
+    });
 };
 
-/**
- * Send push notification to multiple users
- */
 export const sendBulkNotification = async (req, res) => {
-    const { userIds, title, body, data = {} } = req.body;
+    const userIds = req.body.userIds || req.body.user_ids;
+    const { title, body, data = {} } = req.body;
 
-    // Get users' FCM tokens
-    const { data: users, error: usersError } = await supabaseAdmin
-        .from('users')
-        .select('id, fcm_token')
-        .in('id', userIds);
-
-    if (usersError || !users || users.length === 0) {
-        throw new AppError('No users found with FCM tokens', 404);
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+        throw new AppError('User IDs array is required', 400);
+    }
+    if (!title || !body) {
+        throw new AppError('Notification title and body are required', 400);
     }
 
-    const tokens = users
-        .filter(u => u.fcm_token)
-        .map(u => u.fcm_token);
+    const objectIds = userIds.map((id) => requireObjectId(id, 'userId'));
+    const users = await User.find({ _id: { $in: objectIds } }).select('_id fcm_token push_tokens');
 
-    if (tokens.length === 0) {
-        throw new AppError('No valid FCM tokens found', 400);
+    // Persist in-app notifications for every recipient.
+    await Notification.insertMany(
+        users.map((user) => ({ user_id: user._id, title, body, data, sent_at: new Date() })),
+    );
+    await invalidateCache(['notifications:*', 'dashboard:*']);
+
+    const tokens = users.map(fcmTokenFor).filter(Boolean);
+    const willPush = tokens.length > 0 && isPushReady();
+    if (willPush) {
+        await enqueueNotification({ type: 'push', tokens, title, body, data });
     }
 
-    try {
-        // Send notifications via FCM
-        const message = {
-            notification: {
-                title,
-                body
-            },
-            data: {
-                ...data,
-                timestamp: new Date().toISOString()
-            },
-            tokens
-        };
-
-        const response = await admin.messaging().sendEachForMulticast(message);
-
-        // Log notifications to database
-        const notificationRecords = users
-            .filter(u => u.fcm_token)
-            .map(u => ({
-                user_id: u.id,
-                title,
-                body,
-                data,
-                sent_at: new Date().toISOString()
-            }));
-
-        await supabaseAdmin
-            .from('notifications')
-            .insert(notificationRecords);
-
-        res.status(200).json({
-            message: 'Bulk notifications sent',
-            successCount: response.successCount,
-            failureCount: response.failureCount,
-            totalCount: tokens.length
-        });
-    } catch (error) {
-        console.error('Error sending bulk notifications:', error);
-        throw new AppError('Failed to send bulk notifications', 500);
-    }
+    res.status(202).json({
+        message: 'Bulk notifications queued',
+        recipients: users.length,
+        pushTargets: tokens.length,
+        delivery: willPush ? 'queued' : 'stored_only',
+    });
 };

@@ -10,7 +10,7 @@ import {
   Alert,
   SafeAreaView,
 } from 'react-native';
-import { supabase } from '../integrations/supabase/client';
+import { MongoDB } from '../integrations/mongodb/client';
 import { useAuth } from '../hooks/useAuth';
 import { useDoctorByUserId } from '../hooks/useDoctors';
 import { useDoctorAppointments } from '../hooks/useAppointments';
@@ -43,7 +43,7 @@ const DoctorDashboard = ({ navigation }) => {
           { 
             text: 'Record & Start', 
             onPress: async () => {
-              await supabase.from('appointments').update({
+              await MongoDB.from('appointments').update({
                 consent_recorded: true,
                 consent_recorded_at: new Date().toISOString(),
               }).eq('id', appt.id);
@@ -61,7 +61,7 @@ const DoctorDashboard = ({ navigation }) => {
     try {
       const res = await updateStatus(appt.id, 'in_consultation');
       if (res.success) {
-        await supabase.from('encounters').insert({
+        await MongoDB.from('encounters').insert({
           appointment_id: appt.id,
           doctor_id: activeDoctor?.id,
           patient_id: appt.patient_id,

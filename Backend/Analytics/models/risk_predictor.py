@@ -36,30 +36,46 @@ async def predict_patient_risks(
 
     df = preprocess(df_raw)
     df = build_features(df)
-    X, y = get_feature_matrix(df)
 
-    model, scaler = _load_or_train(X, y)
+    today = pd.Timestamp.now().normalize()
+    training_df = df[df["appointment_date"] < today].copy()
+    prediction_df = df[df["appointment_date"] >= today].copy()
 
-    X_scaled = scaler.transform(X.fillna(0))
+    if training_df.empty:
+        training_df = df
+    if prediction_df.empty:
+        prediction_df = df
+
+    X_train, y_train = get_feature_matrix(training_df)
+    model, scaler = _load_or_train(X_train, y_train)
+
+    X_predict, _ = get_feature_matrix(prediction_df)
+    X_scaled = scaler.transform(X_predict.fillna(0))
     scores = model.predict_proba(X_scaled)[:, 1]
 
-    df["risk_score"] = scores
-    df["risk_label"] = pd.cut(
+    prediction_df["risk_score"] = scores
+    prediction_df["risk_label"] = pd.cut(
         scores,
         bins=[0, 0.35, 0.60, 1.0],
         labels=["low", "medium", "high"],
         include_lowest=True,  # a score of exactly 0.0 must land in "low", not NaN
     )
 
-    if risk_level:
-        result_df = df[df["risk_label"] == risk_level]
+    normalized_risk_level = risk_level.lower() if risk_level else None
+    source_df = prediction_df
+
+    if normalized_risk_level:
+        result_df = source_df[source_df["risk_label"] == normalized_risk_level]
     else:
-        result_df = df[df["risk_label"] == "high"]
+        result_df = source_df[source_df["risk_label"] == "high"]
+
+    if result_df.empty:
+        result_df = source_df
 
     result_df = result_df.sort_values("risk_score", ascending=False).head(limit)
 
     # Top risk factors (feature importances mapped to patient)
-    feature_names = X.columns.tolist()
+    feature_names = X_train.columns.tolist()
     importances = model.feature_importances_
     top_features = sorted(
         zip(feature_names, importances), key=lambda x: x[1], reverse=True
@@ -69,6 +85,11 @@ async def predict_patient_risks(
         "patients": [
             {
                 "patient_id": str(row["patient_id"]),
+                "patient_name": row.get("patient_name", "Patient"),
+                "appointment_id": str(row["id"]),
+                "appointment_date": row["appointment_date"].date().isoformat()
+                if not pd.isna(row["appointment_date"]) else None,
+                "appointment_time": row.get("appointment_time", "09:00"),
                 "risk_score": round(float(row["risk_score"]), 3),
                 "risk_label": str(row["risk_label"]),
                 "specialty": row.get("specialty", "Unknown"),
@@ -82,9 +103,9 @@ async def predict_patient_risks(
             {"feature": f, "importance": round(float(i), 4)}
             for f, i in top_features
         ],
-        "total_high_risk": int((df["risk_label"] == "high").sum()),
-        "total_medium_risk": int((df["risk_label"] == "medium").sum()),
-        "total_low_risk": int((df["risk_label"] == "low").sum()),
+        "total_high_risk": int((source_df["risk_label"] == "high").sum()),
+        "total_medium_risk": int((source_df["risk_label"] == "medium").sum()),
+        "total_low_risk": int((source_df["risk_label"] == "low").sum()),
     }
 
 

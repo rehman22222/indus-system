@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 /**
  * Generates a unique appointment token in format: D-MMDD-NNN
@@ -21,7 +21,7 @@ export async function generateUniqueToken(
         const token = `${docPrefix}-${month}${day}-${random}`;
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await MongoDB
                 .from('appointments')
                 .select('id')
                 .eq('token', token)
@@ -50,7 +50,7 @@ export async function generateUniqueToken(
 
 /**
  * Offline token generator — no DB check needed
- * Used when Supabase is not configured
+ * Used when MongoDB is not configured
  */
 export function generateOfflineToken(doctorId: string, date: string): string {
     const parts = doctorId?.split('-');

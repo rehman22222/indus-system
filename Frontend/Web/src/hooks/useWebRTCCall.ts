@@ -1,12 +1,12 @@
 // =================================================================
 // useWebRTCCall — peer-to-peer video call over native WebRTC with
-// Supabase Realtime as the ONLY signaling channel.
+// MongoDB Realtime as the ONLY signaling channel.
 //
 // • getUserMedia() for camera + mic
 // • getDisplayMedia() for screen share (RTCRtpSender.replaceTrack —
 //   no renegotiation for the swap)
 // • RTCPeerConnection with the project's STUN/TURN config
-// • Supabase Realtime broadcast for SDP + ICE exchange, presence to
+// • MongoDB Realtime broadcast for SDP + ICE exchange, presence to
 //   detect when the second peer joins the room
 // • ICE-failure auto-recovery: oniceconnectionstatechange →
 //   'disconnected'|'failed' → restartIce() (caller re-offers with
@@ -18,8 +18,8 @@
 // =================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import type { RealtimeChannel } from '@/integrations/mongodb/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 export type CallRole = 'doctor' | 'patient';
 export type CallStatus =
@@ -82,7 +82,7 @@ export function useWebRTCCall({ roomId, role, enabled }: UseWebRTCCallArgs) {
     screenStreamRef.current = null;
     cameraTrackRef.current = null;
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
+      MongoDB.removeChannel(channelRef.current);
       channelRef.current = null;
     }
     pendingIce.current = [];
@@ -239,7 +239,7 @@ export function useWebRTCCall({ roomId, role, enabled }: UseWebRTCCallArgs) {
           }
         };
 
-        const channel = supabase.channel(`webrtc-room-${roomId}`, {
+        const channel = MongoDB.channel(`webrtc-room-${roomId}`, {
           config: { broadcast: { self: false }, presence: { key: role } },
         });
         channelRef.current = channel;

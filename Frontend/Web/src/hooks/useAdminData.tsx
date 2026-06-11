@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  supabase,
-} from '@/integrations/supabase/client';
+  MongoDB,
+} from '@/integrations/mongodb/client';
 import { format } from 'date-fns';
 
 export interface AppointmentStats {
@@ -64,7 +64,7 @@ export function useAdminStats(selectedDate: Date) {
       setIsLoading(true);
 
       // Fetch appointments for the selected date
-      const { data: appointments, error: apptError } = await supabase
+      const { data: appointments, error: apptError } = await MongoDB
         .from('appointments')
         .select(`
           id,
@@ -111,7 +111,7 @@ export function useAdminStats(selectedDate: Date) {
       }
 
       // Fetch doctors with their stats for today
-      const { data: doctors, error: docError } = await supabase
+      const { data: doctors, error: docError } = await MongoDB
         .from('doctors')
         .select(`
           id,
@@ -191,7 +191,7 @@ export function useAdminStats(selectedDate: Date) {
     fetchStats();
 
     // Set up real-time subscription for appointments
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-appointments')
       .on(
         'postgres_changes',
@@ -207,7 +207,7 @@ export function useAdminStats(selectedDate: Date) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [fetchStats]);
 
@@ -230,7 +230,7 @@ export function useNotifications() {
     const fetchNotifications = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await MongoDB
           .from('notifications')
           .select('id, user_id, title, message, type, is_read, read_at, target_role, related_entity_type, related_entity_id, is_broadcast, created_at')
           .order('created_at', { ascending: false })
@@ -250,7 +250,7 @@ export function useNotifications() {
     fetchNotifications();
 
     // Real-time subscription
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-notifications')
       .on(
         'postgres_changes',
@@ -260,12 +260,12 @@ export function useNotifications() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, []);
 
   const markAsRead = async (notificationId: string) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('notifications')
       .update({ is_read: true })
       .eq('id', notificationId);
@@ -282,7 +282,7 @@ export function useNotifications() {
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
     if (unreadIds.length === 0) return;
 
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('notifications')
       .update({ is_read: true })
       .in('id', unreadIds);
@@ -300,7 +300,7 @@ export function useNotifications() {
     targetRole?: string,
     isBroadcast: boolean = false
   ) => {
-    const { error } = await supabase.from('notifications').insert([{
+    const { error } = await MongoDB.from('notifications').insert([{
       title,
       message,
       type,
@@ -328,7 +328,7 @@ export function useSystemSettings() {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await MongoDB
           .from('system_settings')
           .select('key, value');
 
@@ -350,7 +350,7 @@ export function useSystemSettings() {
   }, []);
 
   const updateSetting = async (key: string, value: any) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('system_settings')
       .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
@@ -371,7 +371,7 @@ export function useAdminDoctorManagement() {
   const fetchDoctors = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('doctors')
         .select(`
           id, full_name, license_no, email, phone, specialty,
@@ -382,7 +382,7 @@ export function useAdminDoctorManagement() {
         .order('full_name');
 
       if (error) throw error;
-      // Live Supabase rows only. Alias `full_name` → `name` so
+      // Live MongoDB rows only. Alias `full_name` → `name` so
       // consumers using the legacy field name keep working. No static
       // fallback — an empty table yields an empty list.
       setDoctors((data || []).map((d: any) => ({ ...d, name: d.full_name })));
@@ -407,7 +407,7 @@ export function useAdminDoctorManagement() {
     dailyPhysicalQuota?: number;
     dailyVideoQuota?: number;
   }) => {
-    const { data, error } = await supabase.from('doctors').insert({
+    const { data, error } = await MongoDB.from('doctors').insert({
       full_name: doctorData.name,
       // license_no is NOT NULL UNIQUE in the schema; generate a placeholder
       // when admin doesn't supply one so the insert doesn't fail.
@@ -440,10 +440,10 @@ export function useAdminDoctorManagement() {
     schedule: any;
   }>) => {
     // Translate `name` (legacy public API of this hook) into the schema's
-    // `full_name` column before sending to Supabase.
+    // `full_name` column before sending to MongoDB.
     const { name, ...rest } = updates;
     const dbUpdates = name !== undefined ? { ...rest, full_name: name } : rest;
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('doctors')
       .update(dbUpdates)
       .eq('id', doctorId);
@@ -483,7 +483,7 @@ export function useAdminAppointments(selectedDate: Date) {
       // (name, patient_id) while reading from canonical schema columns
       // (full_name, indus_id). dob/sex are surfaced verbatim — display
       // sites that read .age/.gender will fall back to '-'.
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('appointments')
         .select(`
           id, token, patient_id, doctor_id, appointment_date, appointment_time,
@@ -509,7 +509,7 @@ export function useAdminAppointments(selectedDate: Date) {
   useEffect(() => {
     fetchAppointments();
 
-    const channel = supabase
+    const channel = MongoDB
       .channel('admin-appointments-list')
       .on(
         'postgres_changes',
@@ -519,7 +519,7 @@ export function useAdminAppointments(selectedDate: Date) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [fetchAppointments]);
 
@@ -527,7 +527,7 @@ export function useAdminAppointments(selectedDate: Date) {
     appointmentId: string,
     status: 'confirmed' | 'waiting' | 'in_consultation' | 'completed' | 'cancelled' | 'no_show'
   ) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('appointments')
       .update({ status })
       .eq('id', appointmentId);
@@ -536,7 +536,7 @@ export function useAdminAppointments(selectedDate: Date) {
   };
 
   const reassignDoctor = async (appointmentId: string, newDoctorId: string) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('appointments')
       .update({ doctor_id: newDoctorId })
       .eq('id', appointmentId);
@@ -549,7 +549,7 @@ export function useAdminAppointments(selectedDate: Date) {
     newDate: string,
     newTime: string
   ) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('appointments')
       .update({
         appointment_date: newDate,
@@ -581,7 +581,7 @@ export function useAdminPatients(selectedDate: Date) {
       setIsLoading(true);
 
       // Get patients with appointments for the selected date
-      const { data: appointments, error } = await supabase
+      const { data: appointments, error } = await MongoDB
         .from('appointments')
         .select(`
           id, token, patient_id, doctor_id, appointment_date, appointment_time,

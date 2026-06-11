@@ -22,11 +22,6 @@ export default defineConfig({
             return 'react-vendor';
           }
 
-          // Supabase
-          if (id.includes('node_modules/@supabase/')) {
-            return 'supabase-vendor';
-          }
-
           // Firebase
           if (id.includes('node_modules/firebase/') ||
             id.includes('node_modules/@firebase/')) {
@@ -97,7 +92,6 @@ export default defineConfig({
       'react',
       'react-dom',
       'react-router-dom',
-      '@supabase/supabase-js',
     ],
   },
 })

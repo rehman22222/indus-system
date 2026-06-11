@@ -1,7 +1,7 @@
 // =================================================================
-// Call-invite signaling — Supabase Realtime broadcast only.
+// Call-invite signaling — MongoDB Realtime broadcast only.
 //
-// Channel: call-invite-<userId>  (the recipient's Supabase auth uid)
+// Channel: call-invite-<userId>  (the recipient's MongoDB auth uid)
 // Events:
 //   'call-invite'   doctor → patient : start a video call
 //   'call-declined'  patient → doctor : invitation rejected
@@ -10,7 +10,7 @@
 // signaling rules.
 // =================================================================
 
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 export interface CallInvitePayload {
   appointmentId: string;
@@ -31,7 +31,7 @@ export async function sendCallInvite(
   payload: CallInvitePayload,
 ): Promise<void> {
   if (!toUserId) return;
-  const ch = supabase.channel(inviteChannelName(toUserId));
+  const ch = MongoDB.channel(inviteChannelName(toUserId));
   await new Promise<void>((resolve) => {
     let settled = false;
     const done = () => { if (!settled) { settled = true; resolve(); } };
@@ -45,5 +45,5 @@ export async function sendCallInvite(
     // Safety timeout so we never hang the caller.
     setTimeout(done, 4000);
   });
-  setTimeout(() => { supabase.removeChannel(ch); }, 1500);
+  setTimeout(() => { MongoDB.removeChannel(ch); }, 1500);
 }

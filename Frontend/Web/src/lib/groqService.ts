@@ -1,7 +1,7 @@
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 // The Groq API key is a SERVER-side secret. The browser never sees it: every
-// call is proxied through the `groq-proxy` Supabase edge function, which holds
+// call is proxied through the `groq-proxy` MongoDB edge function, which holds
 // GROQ_API_KEY as a function secret. If the function isn't deployed/configured,
 // each helper degrades gracefully to '' (AI features simply stay hidden).
 const GROQ_PROXY_FUNCTION = 'groq-proxy';
@@ -16,7 +16,7 @@ async function callGroq(
     maxTokens: number = 150
 ): Promise<string> {
     try {
-        const { data, error } = await supabase.functions.invoke(GROQ_PROXY_FUNCTION, {
+        const { data, error } = await MongoDB.functions.invoke(GROQ_PROXY_FUNCTION, {
             body: { messages, maxTokens },
         });
 

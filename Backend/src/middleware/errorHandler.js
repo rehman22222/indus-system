@@ -16,6 +16,11 @@ export const errorHandler = (err, req, res, next) => {
         errors = Object.values(err.errors).map(e => e.message);
     }
 
+    if (err.name === 'CastError') {
+        status = 400;
+        message = `Invalid ${err.path || 'identifier'}`;
+    }
+
     // JWT errors
     if (err.name === 'JsonWebTokenError') {
         status = 401;
@@ -27,7 +32,16 @@ export const errorHandler = (err, req, res, next) => {
         message = 'Token expired';
     }
 
-    // Supabase errors
+    // MongoDB duplicate key errors
+    if (err.code === 11000) {
+        status = 409;
+        const fields = Object.keys(err.keyPattern || err.keyValue || {});
+        message = fields.length
+            ? `Duplicate value for: ${fields.join(', ')}`
+            : 'Resource already exists';
+    }
+
+    // Legacy PostgreSQL-style errors
     if (err.code) {
         switch (err.code) {
             case '23505': // Unique violation

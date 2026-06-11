@@ -1,103 +1,116 @@
-import pandas as pd
-import polars as pl
-import numpy as np
 import os
 from datetime import datetime
+
+import polars as pl
+
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Production: Disable mock data by default
 USE_MOCK = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
+
+
+def _id(value) -> str:
+    return str(value) if value is not None else ""
+
+
+def _status(value: str | None) -> str:
+    if value == "no-show":
+        return "no_show"
+    return value or "confirmed"
+
+
+def _risk_label(score: float) -> str:
+    if score >= 0.7:
+        return "high"
+    if score >= 0.35:
+        return "medium"
+    return "low"
 
 
 async def load_patient_data(limit: int = 10000) -> pl.DataFrame:
     if USE_MOCK:
-        logger.warning("USE_MOCK_DATA is enabled. Using empty dataframe fallback if mock generation missing.")
+        logger.warning("USE_MOCK_DATA is enabled. Returning empty dataframe fallback.")
         return pl.DataFrame([])
 
-    # Live Supabase path
     try:
-        from data.supabase_client import get_supabase
-        supabase = get_supabase()
+        from data.mongodb_client import get_mongo_db
+
+        db = get_mongo_db()
         rows = []
-        batch_size = 1000
-        offset = 0
+        appointments = list(
+            db.appointments.find({})
+            .sort([("date", -1), ("time", -1)])
+            .limit(limit)
+        )
 
-        while offset < limit:
-            fetch_count = min(batch_size, limit - offset)
-            response = (
-                supabase.table("appointments")
-                .select(
-                    "id, patient_id, doctor_id, appointment_date, "
-                    "appointment_time, appointment_type, status, "
-                    "chief_complaint, no_show_risk_score, no_show_risk_label, "
-                    "created_at, doctors(specialty), patients(dob, blood_group)"
-                )
-                .range(offset, offset + fetch_count - 1)
-                .execute()
+        doctor_ids = {a.get("doctor_id") for a in appointments if a.get("doctor_id")}
+        patient_ids = {a.get("patient_id") for a in appointments if a.get("patient_id")}
+
+        doctors = {
+            d["_id"]: d
+            for d in db.doctors.find({"_id": {"$in": list(doctor_ids)}})
+        }
+        patients = {
+            p["_id"]: p
+            for p in db.users.find({"_id": {"$in": list(patient_ids)}})
+        }
+
+        for appointment in appointments:
+            doctor = doctors.get(appointment.get("doctor_id"), {})
+            patient = patients.get(appointment.get("patient_id"), {})
+            score = float(
+                appointment.get("no_show_risk_score")
+                or appointment.get("no_show_score")
+                or 0.0
             )
-            batch = response.data or []
-            if not batch:
-                break
 
-            for r in batch:
-                rows.append({
-                    "id": r.get("id", ""),
-                    "patient_id": r.get("patient_id", ""),
-                    "doctor_id": r.get("doctor_id", ""),
-                    "appointment_date": r.get("appointment_date", ""),
-                    "appointment_time": r.get("appointment_time", ""),
-                    "appointment_type": r.get("appointment_type", "physical"),
-                    "status": r.get("status", "confirmed"),
-                    "chief_complaint": r.get("chief_complaint"),
-                    "no_show_risk_score": float(r.get("no_show_risk_score") or 0.0),
-                    "no_show_risk_label": r.get("no_show_risk_label") or "low",
-                    "created_at": r.get("created_at", ""),
-                    "specialty": (r.get("doctors") or {}).get("specialty", "General Medicine"),
-                    "dob": (r.get("patients") or {}).get("dob", "1990-01-01"),
-                    "blood_group": (r.get("patients") or {}).get("blood_group", "O+"),
-                })
+            rows.append(
+                {
+                    "id": _id(appointment.get("_id")),
+                    "patient_id": _id(appointment.get("patient_id")),
+                    "patient_name": patient.get("name") or patient.get("full_name") or "Patient",
+                    "doctor_id": _id(appointment.get("doctor_id")),
+                    "appointment_date": appointment.get("date") or appointment.get("appointment_date") or "",
+                    "appointment_time": appointment.get("time") or appointment.get("appointment_time") or "",
+                    "appointment_type": appointment.get("appointment_type", "physical"),
+                    "status": _status(appointment.get("status")),
+                    "chief_complaint": appointment.get("chief_complaint"),
+                    "no_show_risk_score": score,
+                    "no_show_risk_label": appointment.get("no_show_risk_label") or _risk_label(score),
+                    "created_at": appointment.get("created_at", ""),
+                    "specialty": doctor.get("specialty", "General Medicine"),
+                    "dob": patient.get("date_of_birth") or patient.get("dob") or "1990-01-01",
+                    "blood_group": patient.get("blood_group", "O+"),
+                }
+            )
 
-            offset += fetch_count
-            logger.info(f"Loaded {len(rows):,} rows...")
-            if len(batch) < fetch_count:
-                break
-
-        logger.info(f"Total records loaded from Supabase: {len(rows):,}")
+        logger.info(f"Total records loaded from MongoDB: {len(rows):,}")
         return pl.DataFrame(rows)
 
     except Exception as e:
-        logger.error(f"Supabase loading error: {e}")
+        logger.error(f"MongoDB loading error: {e}")
         return pl.DataFrame([])
 
 
 async def get_live_stats() -> dict:
     try:
-        from data.supabase_client import get_supabase
-        supabase = get_supabase()
+        from data.mongodb_client import get_mongo_db
+
+        db = get_mongo_db()
         today = datetime.now().date().isoformat()
 
-        today_res = (
-            supabase.table("appointments")
-            .select("id, status, appointment_type")
-            .eq("appointment_date", today)
-            .execute()
-        )
-        total_res = supabase.table("appointments").select("id", count="exact").execute()
-        patient_res = supabase.table("patients").select("id", count="exact").execute()
-        doctor_res = (
-            supabase.table("doctors")
-            .select("id", count="exact")
-            .eq("is_active", True)
-            .execute()
+        today_data = list(
+            db.appointments.find(
+                {"date": today},
+                {"_id": 1, "status": 1, "appointment_type": 1},
+            )
         )
 
-        today_data = today_res.data or []
         total_today = len(today_data)
-        completed = sum(1 for a in today_data if a["status"] == "completed")
-        confirmed = sum(1 for a in today_data if a["status"] == "confirmed")
-        no_shows = sum(1 for a in today_data if a["status"] == "no_show")
+        completed = sum(1 for a in today_data if a.get("status") == "completed")
+        confirmed = sum(1 for a in today_data if a.get("status") == "confirmed")
+        no_shows = sum(1 for a in today_data if a.get("status") in ("no-show", "no_show"))
 
         return {
             "today": {
@@ -108,9 +121,9 @@ async def get_live_stats() -> dict:
                 "no_show_rate": round(no_shows / total_today * 100, 1) if total_today else 0,
             },
             "totals": {
-                "all_appointments": total_res.count or 0,
-                "total_patients": patient_res.count or 0,
-                "active_doctors": doctor_res.count or 0,
+                "all_appointments": db.appointments.count_documents({}),
+                "total_patients": db.users.count_documents({"role": "patient"}),
+                "active_doctors": db.doctors.count_documents({"is_active": True}),
             },
         }
     except Exception as e:

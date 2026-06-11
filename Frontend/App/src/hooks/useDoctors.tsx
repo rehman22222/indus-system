@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { safeQuery } from '@/lib/safeQuery';
-import { DOCTOR_LIST_SELECT, DOCTOR_DETAIL_SELECT } from '@/integrations/supabase/queries';
+import { DOCTOR_LIST_SELECT, DOCTOR_DETAIL_SELECT } from '@/integrations/mongodb/queries';
 import { getCached, setCached, CACHE_TTL } from '@/lib/queryCache';
-import type { Doctor } from '@/integrations/supabase/types';
+import type { Doctor } from '@/integrations/mongodb/types';
+
+export type { Doctor };
 
 
 const CACHE_KEY = 'doctors:active';
@@ -34,7 +36,7 @@ export function useDoctors() {
 
     const data = await safeQuery(
       () =>
-        supabase
+        MongoDB
           .from('doctors')
           .select(DOCTOR_LIST_SELECT)
           .eq('is_active', true)
@@ -76,7 +78,7 @@ export function useDoctorByUserId(userId: string | undefined) {
 
         const data = await safeQuery(
           () =>
-            supabase
+            MongoDB
               .from('doctors')
               .select(DOCTOR_DETAIL_SELECT)
               .eq('user_id', userId)

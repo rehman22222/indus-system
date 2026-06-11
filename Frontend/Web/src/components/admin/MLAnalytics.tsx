@@ -21,7 +21,7 @@ import {
     CheckCircle2,
     XCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface MLAnalyticsProps {
@@ -122,6 +122,11 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
     }
 
     const { ensemble, forecast, risks } = mlData;
+    const forecastVolumes = forecast.predicted_volume.map((value) => {
+        const volume = Number(value);
+        return Number.isFinite(volume) ? Math.max(0, volume) : 0;
+    });
+    const maxForecastVolume = Math.max(1, ...forecastVolumes);
 
     return (
         <div className="space-y-6">
@@ -131,7 +136,7 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
                         <Brain className="h-8 w-8 text-primary" />
                         Analytics & Predictions
                     </h1>
-                    <p className="text-muted-foreground mt-1 flex items-center gap-2">
+                    <div className="text-muted-foreground mt-1 flex items-center gap-2">
                         Statistical insights and predictive analytics
                         {isPythonAPIAvailable ? (
                             <Badge variant="default" className="ml-2">
@@ -144,7 +149,7 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
                                 Using Rule-Based Analytics
                             </Badge>
                         )}
-                    </p>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     {isPythonAPIAvailable && (
@@ -215,7 +220,7 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
                     <CardContent>
                         <div className="text-2xl font-bold">{ensemble.high_risk_count}</div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Appointments with score ≥ 0.60
+                            Appointments with score &gt;= 0.60
                         </p>
                     </CardContent>
                 </Card>
@@ -247,27 +252,32 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">
-                        {forecast.dates.map((date, index) => (
-                            <div key={date} className="flex items-center justify-between py-2 border-b last:border-0">
-                                <div className="flex items-center gap-3">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium">
-                                        {format(new Date(date), 'EEE, MMM d')}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-32 bg-secondary rounded-full h-2">
-                                        <div
-                                            className="bg-primary h-2 rounded-full"
-                                            style={{ width: `${(forecast.predicted_volume[index] / 20) * 100}%` }}
-                                        />
+                        {forecast.dates.map((date, index) => {
+                            const volume = forecastVolumes[index] ?? 0;
+                            const barWidth = Math.min(100, Math.round((volume / maxForecastVolume) * 100));
+
+                            return (
+                                <div key={date} className="flex min-w-0 items-center justify-between gap-4 py-2 border-b last:border-0">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <span className="truncate text-sm font-medium">
+                                            {format(parseISO(date), 'EEE, MMM d')}
+                                        </span>
                                     </div>
-                                    <span className="text-sm font-semibold w-8 text-right">
-                                        {forecast.predicted_volume[index]}
-                                    </span>
+                                    <div className="flex shrink-0 items-center gap-3">
+                                        <div className="h-2 w-36 overflow-hidden rounded-full bg-secondary sm:w-48 md:w-64">
+                                            <div
+                                                className="h-2 rounded-full bg-primary"
+                                                style={{ width: `${barWidth}%` }}
+                                            />
+                                        </div>
+                                        <span className="w-12 text-right text-sm font-semibold tabular-nums">
+                                            {volume}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </CardContent>
             </Card>
@@ -312,7 +322,7 @@ export function MLAnalytics({ selectedDate }: MLAnalyticsProps) {
                                             </Badge>
                                         </div>
                                         <div className="text-sm text-muted-foreground">
-                                            {format(new Date(risk.appointment_date), 'MMM d, yyyy')} at {risk.appointment_time}
+                                            {format(parseISO(risk.appointment_date), 'MMM d, yyyy')} at {risk.appointment_time}
                                         </div>
                                     </div>
                                     <Button variant="outline" size="sm">

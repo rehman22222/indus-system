@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
-import type { Doctor, Patient, Appointment } from '@/integrations/supabase/types';
+import type { Doctor, Patient, Appointment } from '@/integrations/mongodb/types';
 
 // Doctors Context
 interface DoctorsContextType {

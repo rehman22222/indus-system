@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { safeQuery } from '@/lib/safeQuery';
-import { DOCTOR_LIST_SELECT, DOCTOR_DETAIL_SELECT } from '@/integrations/supabase/queries';
+import { DOCTOR_LIST_SELECT, DOCTOR_DETAIL_SELECT } from '@/integrations/mongodb/queries';
 import { getCached, setCached, CACHE_TTL } from '@/lib/queryCache';
-import type { Doctor } from '@/integrations/supabase/types';
+import type { Doctor } from '@/integrations/mongodb/types';
 
 
 const CACHE_KEY = 'doctors:active';
@@ -34,7 +34,7 @@ export function useDoctors() {
 
     const data = await safeQuery(
       () =>
-        supabase
+        MongoDB
           .from('doctors')
           .select(DOCTOR_LIST_SELECT)
           .eq('is_active', true)
@@ -42,7 +42,7 @@ export function useDoctors() {
       []
     );
 
-    // Live Supabase rows only. No static / mock fallback — if the
+    // Live MongoDB rows only. No static / mock fallback — if the
     // table is empty the list is empty.
     const liveAliased = (data as Doctor[] || []).map(withNameAlias);
 
@@ -79,7 +79,7 @@ export function useDoctorByUserId(userId: string | undefined) {
 
         const data = await safeQuery(
           () =>
-            supabase
+            MongoDB
               .from('doctors')
               .select(DOCTOR_DETAIL_SELECT)
               .eq('user_id', userId)
@@ -112,7 +112,7 @@ export function useDoctorByUserId(userId: string | undefined) {
  * `id` is the email string, NOT the uuid `doctors.user_id`. Filtering
  * `user_id` (a uuid column) by an email string makes PostgREST return
  * HTTP 400. Email is the stable join key here: useStaffCredentials
- * writes doctors.email, and this also works for a real Supabase user.
+ * writes doctors.email, and this also works for a real MongoDB user.
  *
  * `ilike` (exact, no wildcards) makes the match case-insensitive,
  * since authStore lowercases emails but the admin may have typed mixed
@@ -134,7 +134,7 @@ export function useDoctorByEmail(email: string | undefined) {
 
       const data = await safeQuery(
         () =>
-          supabase
+          MongoDB
             .from('doctors')
             .select(DOCTOR_DETAIL_SELECT)
             .ilike('email', email)

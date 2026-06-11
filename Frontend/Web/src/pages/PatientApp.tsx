@@ -24,10 +24,11 @@ import {
   ChevronRight
 } from 'lucide-react';
 import AppointmentQRCode from '@/components/patient/AppointmentQRCode';
-import { VideoConsultation } from '@/components/patient/VideoConsultation';
+import { VideoCall } from '@/components/shared/VideoCall';
+import { getOrCreateVideoRoom } from '@/lib/videoRoom';
 import { IncomingCallListener } from '@/components/patient/IncomingCallListener';
 import { PatientAuthScreen } from '@/components/patient/PatientAuthScreen';
-import type { Appointment, Patient } from '@/integrations/supabase/types';
+import type { Appointment, Patient } from '@/integrations/mongodb/types';
 import type { Prescription } from '@/hooks/usePrescriptions';
 import { DashboardLayout } from '@/components/shared/DashboardLayout';
 
@@ -60,13 +61,15 @@ export default function PatientApp() {
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [qrAppointment, setQrAppointment] = useState<Appointment | null>(null);
   const [videoApt, setVideoApt] = useState<Appointment | null>(null);
+  const [videoRoomUrl, setVideoRoomUrl] = useState<string | null>(null);
+  const [videoProvider, setVideoProvider] = useState<string>('jitsi');
 
   // Success dialog state
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successAppointment, setSuccessAppointment] = useState<{ token: string; doctor: string; date: string; time: string; type: 'physical' | 'video' } | null>(null);
 
   // First-login provisioning. The signup form already collected the
-  // patient's details (stored in Supabase auth user_metadata), so the
+  // patient's details (stored in MongoDB auth user_metadata), so the
   // patient record is created automatically — there is no separate
   // "complete profile" step.
   const provisionedRef = useRef(false);
@@ -133,6 +136,18 @@ export default function PatientApp() {
     toast({ title: 'Logged Out' });
   };
 
+  // Join the video room for a video appointment.
+  const handleJoinVideo = async (apt: Appointment) => {
+    try {
+      const room = await getOrCreateVideoRoom(apt.id);
+      setVideoApt(apt);
+      setVideoRoomUrl(room.url);
+      setVideoProvider(room.provider || 'jitsi');
+    } catch (err: any) {
+      toast({ title: 'Could not join video', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const handleBookAppointment = async () => {
     if (!patient) {
       toast({ title: 'Error', description: 'Patient profile not found.', variant: 'destructive' });
@@ -169,7 +184,7 @@ export default function PatientApp() {
       setShowSuccessDialog(true);
     };
 
-    // Live booking through Supabase.
+    // Live booking through MongoDB.
     const { data, error } = await createAppointment({
       patient_id: patient.id,
       doctor_id: selectedDoctor,
@@ -418,7 +433,7 @@ export default function PatientApp() {
                         </Button>
                       )}
                       {apt.appointment_type === 'video' && ['confirmed', 'waiting', 'in_consultation'].includes(apt.status) && (
-                        <Button size="sm" className="rounded-lg text-xs h-7" onClick={() => setVideoApt(apt)}>
+                        <Button size="sm" className="rounded-lg text-xs h-7" onClick={() => handleJoinVideo(apt)}>
                           <Video className="h-3 w-3 mr-1" /> Join Video
                         </Button>
                       )}
@@ -651,17 +666,17 @@ export default function PatientApp() {
         userId={user?.id}
         onAccept={(aptId) => {
           const found = appointments.find((a) => a.id === aptId);
-          setVideoApt(found ?? ({ id: aptId } as unknown as Appointment));
+          handleJoinVideo(found ?? ({ id: aptId } as unknown as Appointment));
         }}
       />
 
       {/* Video Consultation (full-screen overlay) */}
-      {videoApt && (
-        <VideoConsultation
-          appointmentId={videoApt.id}
-          role="patient"
-          peerName={(videoApt as any).doctor?.full_name || 'Doctor'}
-          onEnd={() => { setVideoApt(null); refetchAppointments(); }}
+      {videoApt && videoRoomUrl && (
+        <VideoCall
+          roomUrl={videoRoomUrl}
+          provider={videoProvider}
+          userName={patient?.name || 'Patient'}
+          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); refetchAppointments(); }}
         />
       )}
 

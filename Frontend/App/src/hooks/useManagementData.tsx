@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  supabase,
-} from '@/integrations/supabase/client';
+  MongoDB,
+} from '@/integrations/mongodb/client';
 import { toast } from 'sonner';
 
 // Types
@@ -103,7 +103,7 @@ export function useManagementStats(date: string) {
       setIsLoading(true);
 
       // Fetch all appointments for the date
-      const { data: appointments, error } = await supabase
+      const { data: appointments, error } = await MongoDB
         .from('appointments')
         .select('id, status, appointment_type, check_in_time, consultation_start_time')
         .eq('appointment_date', date);
@@ -111,7 +111,7 @@ export function useManagementStats(date: string) {
       if (error) throw error;
 
       // Fetch total doctor capacity
-      const { data: doctors, error: docError } = await supabase
+      const { data: doctors, error: docError } = await MongoDB
         .from('doctors')
         .select('daily_physical_quota, daily_video_quota')
         .eq('is_active', true);
@@ -172,7 +172,7 @@ export function useManagementStats(date: string) {
     fetchStats();
 
     // Real-time subscription
-    const channel = supabase
+    const channel = MongoDB
       .channel(`management-stats-${date}`)
       .on(
         'postgres_changes',
@@ -182,7 +182,7 @@ export function useManagementStats(date: string) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [date, fetchStats]);
 
@@ -203,7 +203,7 @@ export function useManagementDoctors(date: string) {
       // declared yet — the safeQuery layer will catch PGRST200 if it is
       // missing, but we avoid the round-trip by selecting plain columns
       // here.
-      const { data: doctorsData, error: docError } = await supabase
+      const { data: doctorsData, error: docError } = await MongoDB
         .from('doctors')
         .select('*')
         .order('full_name');
@@ -211,7 +211,7 @@ export function useManagementDoctors(date: string) {
       if (docError) throw docError;
 
       // Fetch all appointments for the date
-      const { data: appointments, error: apptError } = await supabase
+      const { data: appointments, error: apptError } = await MongoDB
         .from('appointments')
         .select('id, doctor_id, status, appointment_type, check_in_time, consultation_start_time')
         .eq('appointment_date', date);
@@ -266,20 +266,20 @@ export function useManagementDoctors(date: string) {
   useEffect(() => {
     fetchDoctors();
 
-    const channel = supabase
+    const channel = MongoDB
       .channel(`management-doctors-${date}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => fetchDoctors())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'doctors' }, () => fetchDoctors())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [date, fetchDoctors]);
 
   const updateDoctorQuota = async (doctorId: string, physicalQuota: number, videoQuota: number) => {
     try {
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('doctors')
         .update({ 
           daily_physical_quota: physicalQuota,
@@ -302,7 +302,7 @@ export function useManagementDoctors(date: string) {
       const doctor = doctors.find(d => d.id === doctorId);
       if (!doctor) return;
 
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('doctors')
         .update({ 
           daily_physical_quota: doctor.daily_physical_quota + additionalSlots,
@@ -321,7 +321,7 @@ export function useManagementDoctors(date: string) {
 
   const updateDoctorSchedule = async (doctorId: string, schedule: Record<string, { start: string; end: string }>) => {
     try {
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('doctors')
         .update({ 
           schedule,
@@ -357,7 +357,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
     try {
       setIsLoading(true);
 
-      let query = supabase
+      let query = MongoDB
         .from('appointments')
         .select(`
           id, token, patient_id, doctor_id, appointment_date, appointment_time,
@@ -388,7 +388,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
   useEffect(() => {
     fetchAppointments();
 
-    const channel = supabase
+    const channel = MongoDB
       .channel(`management-appointments-${date}-${doctorId || 'all'}`)
       .on(
         'postgres_changes',
@@ -398,7 +398,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      MongoDB.removeChannel(channel);
     };
   }, [date, doctorId, fetchAppointments]);
 
@@ -416,7 +416,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
         updates.consultation_end_time = new Date().toISOString();
       }
 
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('appointments')
         .update({ ...updates, ...additionalData })
         .eq('id', appointmentId);
@@ -432,7 +432,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
 
   const reassignDoctor = async (appointmentId: string, newDoctorId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('appointments')
         .update({ doctor_id: newDoctorId })
         .eq('id', appointmentId);
@@ -448,7 +448,7 @@ export function useManagementAppointments(date: string, doctorId?: string | null
 
   const rescheduleAppointment = async (appointmentId: string, newDate: string, newTime: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('appointments')
         .update({ 
           appointment_date: newDate,
@@ -553,7 +553,7 @@ export function useManagementBroadcast() {
     try {
       setIsSending(true);
 
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('notifications')
         .insert({
           title,
@@ -585,7 +585,7 @@ export function useSlotManagement() {
     // Check current block status from system settings
     const checkBlockStatus = async () => {
       try {
-        const { data } = await supabase
+        const { data } = await MongoDB
           .from('system_settings')
           .select('value')
           .eq('key', 'slots_blocked')
@@ -606,7 +606,7 @@ export function useSlotManagement() {
       setIsLoading(true);
       const newBlockedState = !isBlocked;
 
-      const { error } = await supabase
+      const { error } = await MongoDB
         .from('system_settings')
         .upsert({
           key: 'slots_blocked',

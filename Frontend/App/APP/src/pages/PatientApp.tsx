@@ -26,7 +26,7 @@ import {
 import AppointmentQRCode from '@/components/patient/AppointmentQRCode';
 import { PatientAuthScreen } from '@/components/patient/PatientAuthScreen';
 import { generateOfflineToken } from '@/lib/tokenGenerator';
-import type { Appointment } from '@/integrations/supabase/types';
+import type { Appointment } from '@/integrations/mongodb/types';
 import type { Prescription } from '@/hooks/usePrescriptions';
 import { DashboardLayout } from '@/components/shared/DashboardLayout';
 

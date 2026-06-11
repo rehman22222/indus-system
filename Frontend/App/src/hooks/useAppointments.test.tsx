@@ -1,12 +1,12 @@
 
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useCreateAppointment } from './useAppointments';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { vi } from 'vitest';
 
-// Mock Supabase
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
+// Mock MongoDB
+vi.mock('@/integrations/mongodb/client', () => ({
+  MongoDB: {
     from: vi.fn(() => ({
       insert: vi.fn(() => ({
         select: vi.fn(() => ({ single: vi.fn() }))
@@ -31,8 +31,8 @@ describe('useCreateAppointment', () => {
     };
     const mockResponse = { data: { id: 'new-appt-id', ...appointmentData }, error: null };
     
-    // Mock the chained Supabase calls for a successful insertion
-    const fromMock = supabase.from as vi.Mock;
+    // Mock the chained MongoDB calls for a successful insertion
+    const fromMock = MongoDB.from as vi.Mock;
     const insertMock = fromMock().insert as vi.Mock;
     const selectMock = insertMock().select as vi.Mock;
     const singleMock = selectMock().single as vi.Mock;

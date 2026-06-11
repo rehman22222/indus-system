@@ -1,104 +1,108 @@
-import { supabase } from '../config/supabase.js';
+import jwt from 'jsonwebtoken';
+import { User } from '../models/index.js';
+import { normalizeRole } from '../utils/mongo.js';
+import { env } from '../config/env.js';
+
+function getBearerToken(req) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+    return authHeader.substring(7);
+}
 
 /**
- * Middleware to verify JWT token from Supabase Auth
+ * Verify the application JWT and hydrate req.user from MongoDB.
  */
 export const authMiddleware = async (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization;
+        const token = getBearerToken(req);
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!token) {
             return res.status(401).json({
                 error: 'Unauthorized',
-                message: 'Missing or invalid authorization header'
+                message: 'Missing or invalid authorization header',
             });
         }
 
-        const token = authHeader.substring(7);
+        const payload = jwt.verify(token, env.JWT_SECRET);
+        const userId = payload.userId || payload.sub;
 
-        // Verify token with Supabase
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
+        const user = await User.findById(userId).lean();
+        if (!user || !user.is_active) {
             return res.status(401).json({
                 error: 'Unauthorized',
-                message: 'Invalid or expired token'
+                message: 'Invalid or inactive user',
             });
         }
 
-        // Attach user to request
-        req.user = user;
+        req.auth = payload;
+        req.user = {
+            ...user,
+            id: user._id.toString(),
+        };
+        req.userRole = normalizeRole(user.role);
+
         next();
     } catch (error) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: error.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid token',
+            });
+        }
+
         console.error('Auth middleware error:', error);
         return res.status(500).json({
             error: 'Internal Server Error',
-            message: 'Authentication failed'
+            message: 'Authentication failed',
         });
     }
 };
 
 /**
- * Middleware to check if user has specific role
+ * Require one of the provided lower/upper-case role names.
  */
 export const requireRole = (roles) => {
+    const allowedRoles = roles.map(normalizeRole);
+
     return async (req, res, next) => {
-        try {
-            if (!req.user) {
-                return res.status(401).json({
-                    error: 'Unauthorized',
-                    message: 'Authentication required'
-                });
-            }
-
-            const { data: userData, error } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', req.user.id)
-                .single();
-
-            if (error || !userData) {
-                return res.status(403).json({
-                    error: 'Forbidden',
-                    message: 'User role not found'
-                });
-            }
-
-            if (!roles.includes(userData.role)) {
-                return res.status(403).json({
-                    error: 'Forbidden',
-                    message: `Required role: ${roles.join(' or ')}`
-                });
-            }
-
-            req.userRole = userData.role;
-            next();
-        } catch (error) {
-            console.error('Role check error:', error);
-            return res.status(500).json({
-                error: 'Internal Server Error',
-                message: 'Role verification failed'
+        if (!req.user) {
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: 'Authentication required',
             });
         }
+
+        if (!allowedRoles.includes(normalizeRole(req.user.role))) {
+            return res.status(403).json({
+                error: 'Forbidden',
+                message: `Required role: ${roles.join(' or ')}`,
+            });
+        }
+
+        next();
     };
 };
 
 /**
- * Optional auth - doesn't fail if no token
+ * Optional auth - attaches req.user when a valid token is present.
  */
 export const optionalAuth = async (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization;
+        const token = getBearerToken(req);
+        if (!token) return next();
 
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.substring(7);
-            const { data: { user } } = await supabase.auth.getUser(token);
-            req.user = user || null;
+        const payload = jwt.verify(token, env.JWT_SECRET);
+        const userId = payload.userId || payload.sub;
+        const user = await User.findById(userId).lean();
+
+        if (user && user.is_active) {
+            req.auth = payload;
+            req.user = { ...user, id: user._id.toString() };
+            req.userRole = normalizeRole(user.role);
         }
 
         next();
-    } catch (error) {
-        console.error('Optional auth error:', error);
+    } catch {
         next();
     }
 };

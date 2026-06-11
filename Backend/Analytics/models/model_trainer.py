@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from utils.logger import get_logger
 from data.data_loader import load_patient_data
 from data.data_preprocessor import preprocess
@@ -19,7 +20,11 @@ async def train_all_models() -> dict:
 
     df = preprocess(df_raw)
     df_feat = build_features(df)
-    X, y = get_feature_matrix(df_feat)
+    today = pd.Timestamp.now().normalize()
+    training_df = df_feat[df_feat["appointment_date"] < today].copy()
+    if training_df.empty:
+        training_df = df_feat
+    X, y = get_feature_matrix(training_df)
 
     # Train XGBoost
     try:
@@ -39,6 +44,7 @@ async def train_all_models() -> dict:
         results["prophet"] = f"failed: {e}"
 
     results["total_records"] = len(df)
+    results["training_records"] = len(training_df)
     results["timestamp"] = str(__import__("datetime").datetime.now())
     logger.info(f"Training complete: {results}")
     return results

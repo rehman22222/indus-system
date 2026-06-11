@@ -2,6 +2,7 @@ import express from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 import {
+    createPatient,
     getAllPatients,
     getPatientById,
     updatePatient
@@ -18,6 +19,17 @@ router.get(
     authMiddleware,
     requireRole(['admin', 'management', 'doctor']),
     asyncHandler(getAllPatients)
+);
+
+/**
+ * POST /api/v1/patients
+ * Create patient profile
+ */
+router.post(
+    '/',
+    authMiddleware,
+    requireRole(['admin', 'management']),
+    asyncHandler(createPatient)
 );
 
 /**

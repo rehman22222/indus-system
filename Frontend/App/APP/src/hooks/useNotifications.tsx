@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { requestNotificationPermission, onForegroundMessage } from '@/lib/firebase';
 import { toast } from '@/components/ui/use-toast';
 
@@ -13,7 +13,7 @@ export function useNotifications(userId: string | null) {
             if (token) {
                 setFcmToken(token);
                 // Store FCM token in users table
-                supabase
+                MongoDB
                     .from('users')
                     .update({ fcm_token: token } as any)
                     .eq('id', userId)

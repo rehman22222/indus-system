@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 export interface Prescription {
   id: string;
@@ -37,7 +37,7 @@ export function usePatientPrescriptions(patientId: string | undefined) {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('prescriptions')
         .select(`
           *,
@@ -78,7 +78,7 @@ export function useDoctorPrescriptions(doctorId: string | undefined) {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('prescriptions')
         .select(`
           *,

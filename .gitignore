@@ -9,6 +9,16 @@ package-lock.json
 .env.*.local
 **/.env
 
+# Secrets / service accounts — NEVER commit these
+**/secrets/
+*firebase-adminsdk*.json
+**/google-services.json
+**/GoogleService-Info.plist
+*.p8
+*.p12
+*.jks
+*.keystore
+
 # Logs
 *.log
 npm-debug.log*
@@ -21,6 +31,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 

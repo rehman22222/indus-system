@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDoctors, useDoctorByUserId } from '@/hooks/useDoctors';
 import { useDoctorAppointments, useUpdateAppointment } from '@/hooks/useAppointments';
 import { useDoctorPrescriptions } from '@/hooks/usePrescriptions';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
@@ -65,7 +65,7 @@ export default function DoctorApp() {
     });
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     else {
-      await supabase.from('encounters').insert({
+      await MongoDB.from('encounters').insert({
         appointment_id: apt.id,
         doctor_id: apt.doctor_id,
         patient_id: apt.patient_id,
@@ -79,7 +79,7 @@ export default function DoctorApp() {
 
   const handleRecordConsent = async () => {
     if (!consentDialog) return;
-    await supabase.from('appointments').update({
+    await MongoDB.from('appointments').update({
       consent_recorded: true,
       consent_recorded_at: new Date().toISOString(),
     }).eq('id', consentDialog.id);
@@ -94,7 +94,7 @@ export default function DoctorApp() {
     });
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     else {
-      await supabase.from('encounters').update({
+      await MongoDB.from('encounters').update({
         ended_at: new Date().toISOString(),
       }).eq('appointment_id', apt.id);
       toast({ title: 'Consultation Completed' });

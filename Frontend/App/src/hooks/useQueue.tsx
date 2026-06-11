@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { APPOINTMENT_DETAIL_SELECT } from '@/integrations/supabase/queries';
-import type { Appointment } from '@/integrations/supabase/types';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { MongoDB } from '@/integrations/mongodb/client';
+import { APPOINTMENT_DETAIL_SELECT } from '@/integrations/mongodb/queries';
+import type { Appointment } from '@/integrations/mongodb/types';
+import type { RealtimeChannel } from '@/integrations/mongodb/client';
 
 export function useQueue(doctorId: string | undefined, date: string) {
     const [queue, setQueue] = useState<Appointment[]>([]);
@@ -19,7 +19,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
         setError(null);
 
         try {
-            const { data, error: fetchErr } = await supabase
+            const { data, error: fetchErr } = await MongoDB
                 .from('appointments')
                 .select(APPOINTMENT_DETAIL_SELECT)
                 .eq('doctor_id', doctorId)
@@ -45,7 +45,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
 
         let channel: RealtimeChannel | null = null;
         try {
-            channel = supabase
+            channel = MongoDB
                 .channel(`queue:${doctorId}:${date}`)
                 .on(
                     'postgres_changes',
@@ -67,7 +67,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
 
         return () => {
             if (channel) {
-                supabase.removeChannel(channel);
+                MongoDB.removeChannel(channel);
             }
         };
     }, [doctorId, date, fetchQueue]);
@@ -79,7 +79,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
         }
 
         try {
-            const { error: updateErr } = await supabase
+            const { error: updateErr } = await MongoDB
                 .from('appointments')
                 .update({
                     status: 'in_consultation',
@@ -101,7 +101,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
     const markComplete = useCallback(
         async (appointmentId: string) => {
             try {
-                const { error: updateErr } = await supabase
+                const { error: updateErr } = await MongoDB
                     .from('appointments')
                     .update({
                         status: 'completed',
@@ -133,7 +133,7 @@ export function useQueue(doctorId: string | undefined, date: string) {
                     updates.consultation_end_time = new Date().toISOString();
                 }
 
-                const { error: updateErr } = await supabase
+                const { error: updateErr } = await MongoDB
                     .from('appointments')
                     .update(updates)
                     .eq('id', appointmentId);

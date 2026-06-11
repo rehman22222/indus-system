@@ -8,13 +8,12 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 /**
  * Top-level auth wrapper — HYBRID model:
  *
- *  • PATIENTS authenticate via real Supabase Auth. Their session is
- *    persisted by supabase-js, so on reload `useAuth().session` is
- *    restored and we skip the login screen and go straight to /patient
- *    (route protection / "session exists → home").
+ *  • PATIENTS authenticate via the mobile app in production. If a
+ *    patient reaches the web app, AuthGate routes them to the mobile
+ *    handoff screen at /patient instead of loading a patient dashboard.
  *
  *  • STAFF (admin / doctor / management / receptionist) have no
- *    Supabase account; they live in the in-memory authStore. That
+ *    MongoDB account; they live in the in-memory authStore. That
  *    session is intentionally NOT persisted, so staff still see the
  *    login screen on a fresh launch and route by their authStore role
  *    (this preserves receptionist → /check-in etc).
@@ -30,9 +29,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   const hasRealSession = !!session?.user;
   const authed = hasRealSession || !!staffUser;
-  // Real Supabase sessions route by the role useAuth derived from the
-  // email (admin*/doctor*/management*@indus.org.pk → staff portal,
-  // anything else → patient). Legacy in-memory staff still route by
+  // Real MongoDB sessions route by the role useAuth derived from the
+  // email/API role. Staff route to their web portals; patients route to
+  // the mobile handoff page. Legacy in-memory staff still route by
   // their stored role.
   const realSessionRole = roles[0];
   const realSessionHome =
@@ -54,7 +53,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [authed, home, location.pathname, navigate]);
 
-  // Wait for Supabase to restore a persisted session before deciding
+  // Wait for MongoDB to restore a persisted session before deciding
   // (avoids a login-screen flash on reload). Staff are synchronous, so
   // don't block on them.
   if (isLoading && !staffUser) {

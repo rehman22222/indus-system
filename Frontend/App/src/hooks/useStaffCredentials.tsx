@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 
 interface CreateStaffResult {
   success: boolean;
@@ -26,8 +26,8 @@ export function useStaffCredentials() {
     setIsCreating(true);
     
     try {
-      // Step 1: Create auth user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Step 1: Create auth user with MongoDB Auth
+      const { data: authData, error: authError } = await MongoDB.auth.signUp({
         email,
         password,
         options: {
@@ -53,7 +53,7 @@ export function useStaffCredentials() {
 
       // Step 3: Add the staff role (we need to do this as admin)
       // Note: This will only work if current user is admin due to RLS
-      const { error: roleError } = await supabase
+      const { error: roleError } = await MongoDB
         .from('user_roles')
         .insert({
           user_id: userId,
@@ -68,7 +68,7 @@ export function useStaffCredentials() {
 
       // Step 4: If creating a doctor, also create a doctors record
       if (role === 'doctor' && additionalData) {
-        const { error: doctorError } = await supabase
+        const { error: doctorError } = await MongoDB
           .from('doctors')
           .insert({
             user_id: userId,
@@ -97,7 +97,7 @@ export function useStaffCredentials() {
   };
 
   const linkDoctorToUser = async (doctorId: string, userId: string) => {
-    const { error } = await supabase
+    const { error } = await MongoDB
       .from('doctors')
       .update({ user_id: userId })
       .eq('id', doctorId);

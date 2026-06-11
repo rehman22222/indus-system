@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { safeQuery } from '@/lib/safeQuery';
-import { PATIENT_DETAIL_SELECT } from '@/integrations/supabase/queries';
-import type { Patient } from '@/integrations/supabase/types';
+import { PATIENT_DETAIL_SELECT } from '@/integrations/mongodb/queries';
+import type { Patient } from '@/integrations/mongodb/types';
 
 // PatientWithLegacyAlias: many components were written against an older
 // shape that exposed `name`, `patient_id`, `age`, and `gender`. Surface
@@ -58,7 +58,7 @@ export function usePatientByUserId(userId: string | undefined) {
       try {
         setIsLoading(true);
         const data = await safeQuery(
-          () => supabase
+          () => MongoDB
             .from('patients')
             .select(PATIENT_DETAIL_SELECT)
             .eq('user_id', userId)
@@ -83,7 +83,7 @@ export function usePatientByUserId(userId: string | undefined) {
     if (!patient) return { error: new Error('No patient loaded') };
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .update(updates)
         .eq('id', patient.id)
@@ -121,7 +121,7 @@ export function useCreatePatient() {
       const randomNum = Math.floor(Math.random() * 9000 + 1000);
       const indusId = `IND-${year}-${randomNum}`;
 
-      const { data, error } = await supabase
+      const { data, error } = await MongoDB
         .from('patients')
         .insert({
           user_id: patientData.user_id,

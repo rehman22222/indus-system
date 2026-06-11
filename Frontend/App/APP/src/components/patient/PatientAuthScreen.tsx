@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { AlertCircle, Loader2, User, Mail, Lock, Phone } from 'lucide-react';
 import { ForgotPassword } from './ForgotPassword';
 import indusLogo from '@/assets/indus-logo.svg';
@@ -26,11 +26,7 @@ export function PatientAuthScreen({ onSignIn, onSignUp, onDemoLogin }: PatientAu
     email: '', password: '', name: '', phone: '', age: '', gender: '',
   });
 
-  // Check if Supabase is configured
-  const isConfigured = Boolean(
-    import.meta.env.VITE_SUPABASE_URL &&
-    !import.meta.env.VITE_SUPABASE_URL.includes('placeholder')
-  );
+  const isConfigured = Boolean(import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL);
 
   const handleSignIn = async () => {
     setAuthError('');

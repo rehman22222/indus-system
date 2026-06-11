@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAdminAppointments } from '@/hooks/useAdminData';
 import { useDoctors } from '@/hooks/useDoctors';
-import { supabase } from '@/integrations/supabase/client';
+import { MongoDB } from '@/integrations/mongodb/client';
 import { NoShowRiskBadge } from '@/components/admin/NoShowRiskBadge';
 
 interface AppointmentManagementProps {
@@ -163,7 +163,7 @@ export function AppointmentManagement({ selectedDate }: AppointmentManagementPro
     if (query.length < 2) { setPatientResults([]); return; }
     setSearchingPatient(true);
     try {
-      const { data } = await supabase
+      const { data } = await MongoDB
         .from('patients')
         .select('id, full_name, indus_id, phone')
         .or(`full_name.ilike.%${query}%,indus_id.ilike.%${query}%,phone.ilike.%${query}%`)
@@ -180,7 +180,7 @@ export function AppointmentManagement({ selectedDate }: AppointmentManagementPro
     }
     setCreating(true);
     try {
-      const { error } = await supabase.from('appointments').insert({
+      const { error } = await MongoDB.from('appointments').insert({
         patient_id: newAppt.patientId,
         doctor_id: newAppt.doctorId,
         appointment_date: newAppt.appointmentDate,

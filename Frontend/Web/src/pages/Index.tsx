@@ -2,22 +2,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import indusLogo from '@/assets/indus-logo.svg';
-import { Shield, Activity, Calendar, Stethoscope, QrCode, User } from 'lucide-react';
+import { Shield, Activity, Stethoscope, QrCode } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
 
   const portals = [
-    {
-      title: 'Patient App',
-      subtitle: 'Book & Manage',
-      desc: 'Appointments, prescriptions & profile',
-      icon: User,
-      route: '/patient',
-      color: 'bg-accent',
-      iconColor: 'text-accent-foreground',
-      btnClass: 'bg-accent hover:bg-accent/90 text-accent-foreground',
-    },
     {
       title: 'Doctor Portal',
       subtitle: 'Consultant Access',
@@ -60,7 +50,7 @@ const Index = () => {
           <p className="text-sm md:text-lg text-muted-foreground">Enterprise Portal Access</p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
           {portals.map((p) => (
             <Card key={p.route} className="p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-lg border hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               onClick={() => navigate(p.route)}>
