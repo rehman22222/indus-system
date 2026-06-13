@@ -14,8 +14,8 @@ export const PATIENT_DETAIL_SELECT = 'id, indus_id, full_name, dob, sex, blood_g
 export const PATIENT_PROFILE_SELECT = 'id, indus_id, full_name, dob, sex, blood_group, phone, email, emergency_contact';
 
 // Appointment queries
-export const APPOINTMENT_LIST_SELECT = 'id, token, patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, chief_complaint, no_show_score, created_at, updated_at, patient:patients(id, name:full_name, phone), doctor:doctors(id, name:full_name, specialty)';
-export const APPOINTMENT_DETAIL_SELECT = 'id, token, patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, chief_complaint, notes, diagnosis, check_in_time, consultation_start_time, consultation_end_time, consent_recorded, consent_recorded_at, no_show_score, governance_status, governance_notes, video_room_url, created_at, updated_at, patient:patients(id, patient_id:indus_id, name:full_name, phone, email, address, dob, sex, blood_group, allergies, current_medications), doctor:doctors(id, name:full_name, specialty, phone)';
+export const APPOINTMENT_LIST_SELECT = 'id, token, patient_id, doctor_id, appointment_date, appointment_time, appointment_type, visit_type, status, chief_complaint, history_summary, no_show_score, created_at, updated_at, patient:patients(id, name:full_name, phone), doctor:doctors(id, name:full_name, specialty)';
+export const APPOINTMENT_DETAIL_SELECT = 'id, token, patient_id, doctor_id, appointment_date, appointment_time, appointment_type, visit_type, status, chief_complaint, history_summary, notes, diagnosis, check_in_time, consultation_start_time, consultation_end_time, consent_recorded, consent_recorded_at, no_show_score, governance_status, governance_notes, video_room_url, created_at, updated_at, patient:patients(id, patient_id:indus_id, name:full_name, phone, email, address, dob, sex, blood_group, allergies, current_medications), doctor:doctors(id, name:full_name, specialty, phone)';
 export const APPOINTMENT_QUEUE_SELECT = 'id, token, appointment_time, status, check_in_time, patient:patients(full_name, phone)';
 export const APPOINTMENT_TOKEN_CHECK_SELECT = 'id';
 

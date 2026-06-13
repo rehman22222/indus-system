@@ -5,6 +5,7 @@ import { setAccessToken } from '@/api/client';
 import type { AuthSession, User } from '@/api/types';
 import { clearSession, readSession, saveSession } from '@/auth/storage';
 import { registerForPushNotifications } from '@/services/notifications';
+import { disconnectRealtime } from '@/services/realtime';
 
 type AuthContextValue = {
   user: User | null;
@@ -38,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAccessToken(stored.token);
         setSession(stored);
         registerForPushNotifications().catch((error) => {
-          console.warn('Push notification registration skipped:', error.message);
+          console.log('Push registration skipped:', error?.message || 'unavailable in Expo Go');
         });
       })
       .finally(() => {
@@ -61,11 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(nextSession);
     await saveSession(JSON.stringify(nextSession));
     registerForPushNotifications().catch((error) => {
-      console.warn('Push notification registration skipped:', error.message);
+      console.log('Push registration skipped:', error?.message || 'unavailable in Expo Go');
     });
   }, []);
 
   const signOut = useCallback(async () => {
+    disconnectRealtime();
     setAccessToken(null);
     setSession(null);
     await clearSession();

@@ -285,6 +285,20 @@ export function useDoctorAppointments(doctorId?: string, date?: string) {
     refetch();
   }, [refetch]);
 
+  useEffect(() => {
+    if (!doctorId) return undefined;
+
+    const channel = MongoDB
+      .channel(`queue:${doctorId}`)
+      .on('queue.updated', {}, () => refetch())
+      .on('documents.updated', {}, () => refetch())
+      .subscribe();
+
+    return () => {
+      MongoDB.removeChannel(channel);
+    };
+  }, [doctorId, refetch]);
+
   return {
     appointments,
     isLoading,

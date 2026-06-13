@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   MongoDB,
+  apiRequest,
 } from '@/integrations/mongodb/client';
 import { toast } from 'sonner';
 
@@ -306,17 +307,12 @@ export function useManagementDoctors(date: string) {
       const doctor = doctors.find(d => d.id === doctorId);
       if (!doctor) return;
 
-      const { error } = await MongoDB
-        .from('doctors')
-        .update({ 
-          daily_physical_quota: doctor.daily_physical_quota + additionalSlots,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', doctorId);
-
-      if (error) throw error;
+      await apiRequest(`/api/v1/management/doctors/${doctorId}/emergency-slots`, {
+        method: 'POST',
+        body: JSON.stringify({ date, count: additionalSlots }),
+      });
       toast.success(`Added ${additionalSlots} emergency slots for ${doctor.name}`);
-      fetchDoctors();
+      await fetchDoctors();
     } catch (err) {
       toast.error('Failed to add emergency slots');
       console.error(err);
@@ -610,15 +606,10 @@ export function useSlotManagement() {
       setIsLoading(true);
       const newBlockedState = !isBlocked;
 
-      const { error } = await MongoDB
-        .from('system_settings')
-        .upsert({
-          key: 'slots_blocked',
-          value: { blocked: newBlockedState, blocked_at: new Date().toISOString() },
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
+      await apiRequest('/api/v1/management/slots/block', {
+        method: 'POST',
+        body: JSON.stringify({ blocked: newBlockedState }),
+      });
 
       setIsBlocked(newBlockedState);
       toast.success(newBlockedState ? 'All slots blocked' : 'All slots unblocked');

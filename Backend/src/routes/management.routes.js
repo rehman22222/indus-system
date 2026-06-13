@@ -4,6 +4,8 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import {
     getManagementDashboard,
     getOperationalAppointments,
+    setSlotBlocking,
+    addEmergencySlots,
 } from '../controllers/management.controller.js';
 import {
     listSystemSettings,
@@ -17,6 +19,8 @@ router.use(authMiddleware, requireRole(['management', 'admin']));
 
 router.get('/dashboard', asyncHandler(getManagementDashboard));
 router.get('/appointments', asyncHandler(getOperationalAppointments));
+router.post('/slots/block', asyncHandler(setSlotBlocking));
+router.post('/doctors/:doctorId/emergency-slots', asyncHandler(addEmergencySlots));
 router.get('/system-settings', asyncHandler(listSystemSettings));
 router.post('/system-settings', asyncHandler(upsertSystemSetting));
 router.patch('/system-settings/:id', asyncHandler(updateSystemSetting));

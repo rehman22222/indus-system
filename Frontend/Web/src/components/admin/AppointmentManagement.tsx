@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ import { useAdminAppointments } from '@/hooks/useAdminData';
 import { useDoctors } from '@/hooks/useDoctors';
 import { MongoDB } from '@/integrations/mongodb/client';
 import { NoShowRiskBadge } from '@/components/admin/NoShowRiskBadge';
+import { useAvailableSlots } from '@/hooks/useSlots';
 
 interface AppointmentManagementProps {
   selectedDate: Date;
@@ -52,6 +53,7 @@ interface AppointmentManagementProps {
 export function AppointmentManagement({ selectedDate }: AppointmentManagementProps) {
   const { appointments, isLoading, updateAppointmentStatus, reassignDoctor, rescheduleAppointment } = useAdminAppointments(selectedDate);
   const { doctors } = useDoctors();
+  const { slots: availableSlots, isLoading: slotsLoading, fetchSlots } = useAvailableSlots();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -76,6 +78,12 @@ export function AppointmentManagement({ selectedDate }: AppointmentManagementPro
   });
   const [patientResults, setPatientResults] = useState<any[]>([]);
   const [searchingPatient, setSearchingPatient] = useState(false);
+
+  useEffect(() => {
+    if (isCreateOpen && newAppt.doctorId && newAppt.appointmentDate) {
+      void fetchSlots(newAppt.doctorId, newAppt.appointmentDate);
+    }
+  }, [fetchSlots, isCreateOpen, newAppt.appointmentDate, newAppt.doctorId]);
 
   const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
 
@@ -335,8 +343,11 @@ export function AppointmentManagement({ selectedDate }: AppointmentManagementPro
                   <div className="space-y-2">
                     <Label>Time *</Label>
                     <Select value={newAppt.appointmentTime} onValueChange={(v) => setNewAppt(prev => ({ ...prev, appointmentTime: v }))}>
-                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Time" /></SelectTrigger>
-                      <SelectContent>{timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder={slotsLoading ? 'Loading...' : 'Time'} /></SelectTrigger>
+                      <SelectContent>
+                        {availableSlots.map(slot => <SelectItem key={slot.id} value={slot.slot_time}>{slot.slot_time}</SelectItem>)}
+                        {!slotsLoading && availableSlots.length === 0 && <SelectItem value="none" disabled>No available slots</SelectItem>}
+                      </SelectContent>
                     </Select>
                   </div>
                 </div>

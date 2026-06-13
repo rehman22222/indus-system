@@ -3,7 +3,7 @@
  * DO NOT modify these without updating the database schema
  */
 
-export type UserRole = 'ADMIN' | 'DOCTOR' | 'PATIENT' | 'MANAGEMENT';
+export type UserRole = 'ADMIN' | 'DOCTOR' | 'PATIENT' | 'MANAGEMENT' | 'RECEPTIONIST';
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type AppointmentStatus = 'confirmed' | 'waiting' | 'in_consultation' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled';
 export type AppointmentType = 'physical' | 'video';
@@ -116,8 +116,10 @@ export interface Appointment {
     appointment_date: string;
     appointment_time: string;
     appointment_type: AppointmentType;
+    visit_type?: 'new' | 'follow_up';
     status: AppointmentStatus;
     chief_complaint?: string | null;
+    history_summary?: string | null;
     notes?: string | null;
     diagnosis?: string | null;
     prescription?: Record<string, unknown> | null;

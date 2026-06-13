@@ -16,6 +16,7 @@ const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const PatientMobileOnly = lazy(() => import("./pages/PatientMobileOnly"));
 const DoctorApp = lazy(() => import("./pages/DoctorApp"));
 const CheckInKiosk = lazy(() => import("./pages/CheckInKiosk"));
+const VideoCallRoom = lazy(() => import("./pages/VideoCallRoom"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -38,22 +39,26 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <AuthGate>
-              <Suspense fallback={<LoadingSpinner />}>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/management" element={<ManagementPortal />} />
-                  <Route path="/admin" element={<AdminPortal />} />
-                  <Route path="/patient" element={<PatientMobileOnly />} />
-                  <Route path="/patient-mobile" element={<PatientMobileOnly />} />
-                  <Route path="/doctor" element={<DoctorApp />} />
-                  <Route path="/check-in" element={<CheckInKiosk />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </AuthGate>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/video-call" element={<VideoCallRoom />} />
+                <Route path="*" element={
+                  <AuthGate>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/management" element={<ManagementPortal />} />
+                      <Route path="/admin" element={<AdminPortal />} />
+                      <Route path="/patient" element={<PatientMobileOnly />} />
+                      <Route path="/patient-mobile" element={<PatientMobileOnly />} />
+                      <Route path="/doctor" element={<DoctorApp />} />
+                      <Route path="/check-in" element={<CheckInKiosk />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </AuthGate>
+                } />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </HospitalDataProvider>

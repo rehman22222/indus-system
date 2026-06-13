@@ -5,6 +5,7 @@
     "private": true,
     "scripts": {
         "dev": "concurrently --names \"BACKEND,WEB\" --prefix-colors \"blue,green\" \"npm run dev:backend\" \"npm run dev:web\"",
+        "dev:https": "powershell -ExecutionPolicy Bypass -File scripts/start-dev-https.ps1",
         "web": "concurrently --names \"BACKEND,APP\" --prefix-colors \"blue,magenta\" \"npm run dev:backend\" \"npm run dev:app\"",
         "app": "npm run dev:app",
         "dev:backend": "cd Backend && node src/server.js",

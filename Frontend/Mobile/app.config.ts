@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import fs from 'node:fs';
 import type { ExpoConfig } from 'expo/config';
 
 const apiBaseUrl =
@@ -6,11 +7,13 @@ const apiBaseUrl =
   process.env.VITE_API_BASE_URL ||
   'http://localhost:5000';
 
-const androidGoogleServicesFile =
-  process.env.GOOGLE_SERVICES_JSON || './google-services.json';
+// Only reference a Firebase config file when it actually exists, otherwise
+// Expo fails to parse the config (e.g. a missing GoogleService-Info.plist).
+const existing = (...candidates: (string | undefined)[]) =>
+  candidates.find((p) => p && fs.existsSync(p));
 
-const iosGoogleServicesFile =
-  process.env.GOOGLE_SERVICE_INFO_PLIST || undefined;
+const androidGoogleServicesFile = existing(process.env.GOOGLE_SERVICES_JSON, './google-services.json');
+const iosGoogleServicesFile = existing(process.env.GOOGLE_SERVICE_INFO_PLIST, './GoogleService-Info.plist');
 
 const config: ExpoConfig = {
   name: 'Indus Hospital',
@@ -70,7 +73,6 @@ const config: ExpoConfig = {
 
   plugins: [
     'expo-secure-store',
-    'expo-status-bar',
     [
       'expo-notifications',
       {

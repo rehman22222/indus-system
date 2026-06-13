@@ -1,5 +1,5 @@
 import { apiRequest, buildQuery } from '@/api/client';
-import type { Appointment, Department, Doctor, QueueEntry, Slot } from '@/api/types';
+import type { Appointment, Department, Doctor, Prescription, QueueEntry, Slot } from '@/api/types';
 
 export async function getDepartments() {
   const response = await apiRequest<{ departments?: Department[]; data?: Department[] }>('/api/v1/departments', {
@@ -34,6 +34,20 @@ export async function getAppointments(params: Record<string, string>) {
   return response.appointments || response.data || [];
 }
 
+export async function getAppointmentById(appointmentId: string) {
+  const response = await apiRequest<{ appointment?: Appointment; data?: Appointment }>(
+    `/api/v1/appointments/${appointmentId}`,
+  );
+  return response.appointment || response.data;
+}
+
+export async function getPrescriptions(params: { appointmentId?: string } = {}) {
+  const response = await apiRequest<{ prescriptions?: Prescription[]; data?: Prescription[] }>(
+    `/api/v1/prescriptions${buildQuery(params)}`,
+  );
+  return response.prescriptions || response.data || [];
+}
+
 export async function createAppointment(input: {
   patient_id: string;
   doctor_id: string;
@@ -42,7 +56,9 @@ export async function createAppointment(input: {
   appointment_date: string;
   appointment_time: string;
   appointment_type: 'physical' | 'video';
+  visit_type?: 'new' | 'follow_up';
   chief_complaint?: string;
+  history_summary?: string;
 }) {
   const response = await apiRequest<{ appointment?: Appointment; data?: Appointment }>('/api/v1/appointments', {
     method: 'POST',

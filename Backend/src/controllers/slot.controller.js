@@ -1,4 +1,4 @@
-import { AuditLog, Slot } from '../models/index.js';
+import { AuditLog, Slot, SystemSetting } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { requireObjectId, serialize } from '../utils/mongo.js';
 import {
@@ -54,6 +54,13 @@ export const listSlots = async (req, res) => {
     });
     const projection = buildProjection(req.query, PROJECTION_FIELDS, FIELD_MAP);
     if (req.query.available !== undefined) filter.is_available = req.query.available === 'true';
+
+    if (filter.is_available === true) {
+        const setting = await SystemSetting.findOne({ setting_key: 'slots_blocked' }).select('setting_value').lean();
+        if (setting?.setting_value?.blocked) {
+            return res.status(200).json({ slots: [], data: [], pagination: { page: 1, limit: list.limit, total: 0, pages: 0 } });
+        }
+    }
 
     const key = cacheKey('slots:list', req.query);
     const result = await getOrSetCache(key, 30, async () => {

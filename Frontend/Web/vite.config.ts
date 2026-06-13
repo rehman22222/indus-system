@@ -5,9 +5,16 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
 
+  define: {
+    global: 'globalThis',
+    'process.env': '{}',
+  },
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      events: 'events/',
+      util: 'util/',
     },
   },
 
@@ -85,6 +92,22 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     open: false,
+    // Allow any host (Cloudflare quick-tunnel hostnames are random each run, and
+    // we also serve to phones/LAN IPs in dev). Safe for local development.
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        headers: { origin: 'http://localhost:5173' },
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+        headers: { origin: 'http://localhost:5173' },
+      },
+    },
   },
 
   optimizeDeps: {

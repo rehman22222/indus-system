@@ -14,6 +14,7 @@
         "db:seed": "node src/scripts/seedDemoData.js",
         "db:seed:video": "node src/scripts/seedVideoCallDemoData.js",
         "db:seed:analytics": "node src/scripts/seedAnalyticsData.js",
+        "db:seed:slots": "node src/scripts/seedSlots.js",
         "db:seed:all": "npm run db:seed && npm run db:seed:analytics",
         "test": "node --test src/tests/password.service.test.js",
         "lint": "eslint src/"

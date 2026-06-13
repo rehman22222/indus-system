@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Loader2, PhoneOff, Video } from 'lucide-react';
+import { ExternalLink, Loader2, PhoneOff, ShieldCheck, Video } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -60,6 +60,7 @@ function parseRoom(roomUrl: string) {
  */
 export function VideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps) {
   const isJitsi = (provider || '').toLowerCase() === 'jitsi' || /jit\.si/.test(roomUrl);
+  const isBrowserOnly = (provider || '').toLowerCase() === 'webrtc';
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<{ dispose: () => void } | null>(null);
   const onEndRef = useRef(onEnd);
@@ -107,9 +108,9 @@ export function VideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps
     };
   }, [isJitsi, roomUrl, userName]);
 
-  // --- Generic hosted-iframe path (non-Jitsi providers) ---
+  // --- Generic hosted-iframe path (legacy non-Jitsi providers) ---
   const iframeSrc = useMemo(() => {
-    if (isJitsi || !roomUrl) return '';
+    if (isJitsi || isBrowserOnly || !roomUrl) return '';
     try {
       const url = new URL(roomUrl);
       if (userName) url.searchParams.set('userName', userName);
@@ -117,7 +118,7 @@ export function VideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps
     } catch {
       return roomUrl;
     }
-  }, [isJitsi, roomUrl, userName]);
+  }, [isBrowserOnly, isJitsi, roomUrl, userName]);
 
   if (!roomUrl) return null;
 
@@ -144,14 +145,30 @@ export function VideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps
       </div>
 
       <div className="relative flex-1">
-        {!loaded && (
+        {!loaded && !isBrowserOnly && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
             <Loader2 className="h-8 w-8 animate-spin" />
             <p className="text-sm">Connecting to the consultation…</p>
           </div>
         )}
 
-        {isJitsi ? (
+        {isBrowserOnly ? (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-white">
+            <div className="max-w-md text-center">
+              <ShieldCheck className="mx-auto mb-5 h-12 w-12 text-emerald-400" />
+              <h2 className="text-2xl font-semibold">Open secure consultation</h2>
+              <p className="mt-3 text-sm leading-6 text-neutral-300">
+                Camera and microphone access will open in a dedicated browser tab.
+              </p>
+              <Button
+                className="mt-6 h-11 rounded-md bg-white px-5 text-neutral-950 hover:bg-neutral-200"
+                onClick={() => window.open(roomUrl, '_blank', 'noopener,noreferrer')}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" /> Open Consultation
+              </Button>
+            </div>
+          </div>
+        ) : isJitsi ? (
           <div ref={containerRef} className="absolute inset-0 h-full w-full" />
         ) : (
           <iframe

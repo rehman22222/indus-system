@@ -32,6 +32,8 @@ const QUEUE_EVENTS = [
   'consultation.started',
   'consultation.completed',
   'appointment.cancelled',
+  'notification:new',
+  'documents.updated',
 ];
 
 let realtimeSocket: Socket | null = null;
@@ -44,6 +46,20 @@ function getRealtimeSocket() {
     });
   }
   return realtimeSocket;
+}
+
+/**
+ * Subscribe to a raw server-emitted Socket.IO event (e.g. `call:declined`)
+ * on the current user's private room. Returns an unsubscribe function.
+ */
+export function onServerEvent(event: string, handler: (payload: any) => void) {
+  const socket = getRealtimeSocket();
+  (socket as any).auth = { token: getAuthToken() };
+  if (!socket.connected) socket.connect();
+  socket.on(event, handler);
+  return () => {
+    socket.off(event, handler);
+  };
 }
 
 export type RealtimeChannel = {
@@ -76,7 +92,7 @@ function clearAuthSession() {
   window.dispatchEvent(new CustomEvent('mongo-auth-change'));
 }
 
-async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(init.headers);
   headers.set('Content-Type', headers.get('Content-Type') || 'application/json');

@@ -1,6 +1,6 @@
 // Resolve (create or reuse) the video consultation room for an appointment via
 // the backend. The backend keeps it idempotent so the doctor and patient always
-// land in the same room (Jitsi by default).
+// receive short-lived, role-specific access to the same private consultation.
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||

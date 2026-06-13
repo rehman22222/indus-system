@@ -1,8 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 56" role="img" aria-label="Indus Hospital">
-  <g transform="translate(8, 8)">
-    <rect width="40" height="40" rx="8" fill="#dc2626"/>
-    <path d="M20 8 L20 18 L10 18 L10 22 L20 22 L20 32 L24 32 L24 22 L34 22 L34 18 L24 18 L24 8 Z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 84" role="img" aria-label="INDUS Hospital and Health Network" font-family="Segoe UI, system-ui, -apple-system, Arial, sans-serif">
+  <!-- H monogram -->
+  <g>
+    <rect x="8" y="12" width="16" height="60" rx="3" fill="#8E1620"/>
+    <rect x="48" y="12" width="16" height="60" rx="3" fill="#BE1E2D"/>
+    <rect x="8" y="34" width="56" height="16" fill="#BE1E2D"/>
   </g>
-  <text x="58" y="36" font-family="-apple-system, system-ui, sans-serif" font-size="22" font-weight="700" fill="#111827">INDUS</text>
-  <text x="58" y="50" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="500" fill="#6b7280" letter-spacing="2">HOSPITAL</text>
+
+  <!-- wordmark -->
+  <text x="86" y="40" font-size="25" font-weight="800" fill="#1B365D" letter-spacing="0.5">INDUS HOSPITAL <tspan fill="#BE1E2D" font-weight="800">&amp;</tspan></text>
+  <rect x="88" y="48" width="244" height="3" fill="#BE1E2D"/>
+  <text x="88" y="71" font-size="17" font-weight="700" fill="#1B365D" letter-spacing="4.5">HEALTH NETWORK</text>
 </svg>

@@ -5,14 +5,21 @@ import { Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Expo Go (SDK 53+) removed remote push notifications — the native push APIs
+// only work in a development/preview build. Detect Expo Go so we skip them
+// quietly instead of logging warnings/network errors.
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 type DeviceTokenPayload = {
   token: string;
@@ -48,7 +55,7 @@ async function registerBackendToken(payload: DeviceTokenPayload) {
 }
 
 export async function registerForPushNotifications() {
-  if (!Device.isDevice) return null;
+  if (isExpoGo || !Device.isDevice) return null;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('appointments', {

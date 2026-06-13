@@ -55,10 +55,34 @@ export type Appointment = {
   appointment_date?: string;
   appointment_time?: string;
   appointment_type: 'physical' | 'video';
+  visit_type?: 'new' | 'follow_up';
   status: string;
   chief_complaint?: string;
+  history_summary?: string;
   doctor?: Doctor;
   patient?: User & { full_name?: string };
+};
+
+export type Medication = {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+};
+
+export type Prescription = {
+  id: string;
+  appointment_id: Appointment | string;
+  doctor_id: Doctor | string;
+  patient_id: User | string;
+  diagnosis?: string;
+  medications: Medication[];
+  instructions?: string;
+  notes?: string;
+  follow_up_date?: string;
+  valid_until?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type QueueEntry = {

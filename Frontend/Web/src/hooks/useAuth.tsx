@@ -34,7 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function normalizeRole(role?: string): AppRole {
   const value = String(role || 'patient').trim().toUpperCase();
-  if (value === 'ADMIN' || value === 'DOCTOR' || value === 'MANAGEMENT' || value === 'PATIENT') {
+  if (value === 'ADMIN' || value === 'DOCTOR' || value === 'MANAGEMENT' || value === 'PATIENT' || value === 'RECEPTIONIST') {
     return value;
   }
   return 'PATIENT';
@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     : roles;
 
   const hasRole = (role: AppRole) => effectiveRoles.includes(role);
-  const isStaff = () => effectiveRoles.some((role) => role === 'ADMIN' || role === 'DOCTOR' || role === 'MANAGEMENT');
+  const isStaff = () => effectiveRoles.some((role) => role === 'ADMIN' || role === 'DOCTOR' || role === 'MANAGEMENT' || role === 'RECEPTIONIST');
 
   return (
     <AuthContext.Provider

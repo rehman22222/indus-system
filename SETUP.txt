@@ -22,7 +22,7 @@ cd ../..
 Step 4: Configure Environment Variables
 ---------------------------------------
 - Copy Backend/.env.example to Backend/.env
-- Add your MongoDB Atlas URI, Daily.co, FCM, Resend API keys
+- Add your MongoDB Atlas URI, FCM and Resend API keys
 - Never put MongoDB credentials in frontend .env files
 
 Step 5: Run the Application
@@ -37,6 +37,9 @@ cd ..
 
 For Web Application:
 npm run dev
+
+For iPhone/Safari video testing with free HTTPS:
+npm run dev:https
 
 For Mobile Application:
 npm run web

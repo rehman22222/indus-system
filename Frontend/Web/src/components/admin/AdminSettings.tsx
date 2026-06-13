@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSystemSettings } from '@/hooks/useAdminData';
-import { MongoDB } from '@/integrations/mongodb/client';
+import { MongoDB, apiRequest } from '@/integrations/mongodb/client';
 import { format } from 'date-fns';
 
 const FEATURE_TOGGLES = [
@@ -27,13 +28,19 @@ const FEATURE_TOGGLES = [
   { key: 'patient_rescheduling', name: 'Patient Rescheduling', description: 'Allow patients to reschedule' },
   { key: 'sms_notifications', name: 'SMS Notifications', description: 'Send SMS reminders' },
   { key: 'walk_in_booking', name: 'Walk-in Booking', description: 'Allow walk-in appointments' },
-  { key: 'auto_noshow', name: 'Auto No-Show Marking', description: 'Auto-mark no-show after threshold (default 30 min)' },
-  { key: 'noshow_threshold_minutes', name: 'No-Show Threshold (min)', description: 'Minutes after slot start to auto-mark no-show' },
+  { key: 'auto_noshow', name: 'Auto No-Show Marking', description: 'Auto-mark no-show after the configured threshold' },
+];
+
+const PREFERENCE_TOGGLES = [
+  { key: 'dark_mode', name: 'Dark Mode' },
+  { key: 'push_notifications', name: 'Push Notifications' },
+  { key: 'sound_alerts', name: 'Sound Alerts' },
 ];
 
 export function AdminSettings() {
   const { settings, isLoading, updateSetting } = useSystemSettings();
   const [localToggles, setLocalToggles] = useState<Record<string, boolean>>({});
+  const [noShowThreshold, setNoShowThreshold] = useState(30);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -42,8 +49,16 @@ export function AdminSettings() {
     FEATURE_TOGGLES.forEach(f => {
       toggles[f.key] = settings[f.key] ?? true;
     });
+    PREFERENCE_TOGGLES.forEach(f => {
+      toggles[f.key] = settings[f.key] ?? (f.key === 'push_notifications');
+    });
     setLocalToggles(toggles);
+    setNoShowThreshold(Number(settings.noshow_threshold_minutes ?? 30));
   }, [settings]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', Boolean(localToggles.dark_mode));
+  }, [localToggles.dark_mode]);
 
   // Fetch audit logs from audit_logs table
   useEffect(() => {
@@ -52,8 +67,8 @@ export function AdminSettings() {
       try {
         const { data } = await MongoDB
           .from('audit_logs')
-          .select('id, actor_user_id, action, entity_type, entity_id, ip_address, user_agent, timestamp')
-          .order('timestamp', { ascending: false })
+          .select('id, user_id, action, collection_name, record_id, new_data, ip_address, user_agent, created_at')
+          .order('created_at', { ascending: false })
           .limit(50);
         setAuditLogs(data || []);
       } catch { /* no logs yet */ }
@@ -95,47 +110,23 @@ export function AdminSettings() {
   };
 
   const handleForceBackup = async () => {
-    // Check if backup already in progress
-    const { data: runningBackup } = await MongoDB
-      .from('backup_jobs')
-      .select('id')
-      .in('status', ['queued', 'running'])
-      .limit(1);
-    
-    if (runningBackup && runningBackup.length > 0) {
-      toast.error('BACKUP_IN_PROGRESS: A backup is already running');
-      return;
+    try {
+      const result = await apiRequest<{ filename: string; backup: unknown }>('/api/v1/admin/backup', {
+        method: 'POST',
+      });
+      const blob = new Blob([JSON.stringify(result.backup, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = result.filename;
+      document.body.appendChild(link);
+      link.click();
+      URL.revokeObjectURL(link.href);
+      link.remove();
+      await updateSetting('last_backup', new Date().toISOString());
+      toast.success('Encrypted-transport logical backup downloaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create backup');
     }
-
-    // Create backup job
-    const { data: job, error } = await MongoDB.from('backup_jobs').insert({
-      status: 'queued',
-      triggered_by: null, // Will be set by auth context
-    }).select().single();
-
-    if (error) {
-      toast.error('Failed to start backup');
-      return;
-    }
-
-    // Simulate backup process (in production this would be a real backup)
-    await MongoDB.from('backup_jobs').update({ 
-      status: 'running', 
-      started_at: new Date().toISOString() 
-    }).eq('id', job.id);
-
-    // Simulate completion
-    setTimeout(async () => {
-      await MongoDB.from('backup_jobs').update({ 
-        status: 'succeeded', 
-        completed_at: new Date().toISOString(),
-        artifact_uri: `backups/${format(new Date(), 'yyyy-MM-dd_HH-mm')}.sql.gz`,
-      }).eq('id', job.id);
-    }, 3000);
-
-    await updateSetting('last_backup', new Date().toISOString());
-    await addAuditEntry('Backup', 'Manual backup initiated');
-    toast.success('Backup job started');
   };
 
   const handleExportAll = async () => {
@@ -209,6 +200,23 @@ export function AdminSettings() {
                 />
               </div>
             ))}
+            <div className="flex items-center justify-between gap-4 p-3 bg-secondary/50 rounded-xl">
+              <div>
+                <p className="font-medium text-sm">No-Show Threshold</p>
+                <p className="text-xs text-muted-foreground">Minutes after slot start before auto no-show</p>
+              </div>
+              <Input
+                aria-label="No-show threshold minutes"
+                type="number"
+                min={5}
+                max={240}
+                step={5}
+                value={noShowThreshold}
+                onChange={(event) => setNoShowThreshold(Number(event.target.value))}
+                onBlur={() => updateSetting('noshow_threshold_minutes', Math.min(240, Math.max(5, noShowThreshold)))}
+                className="w-24"
+              />
+            </div>
           </div>
         </Card>
 
@@ -275,8 +283,8 @@ export function AdminSettings() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm">{log.action}</p>
                       <p className="text-xs text-muted-foreground">
-                        {log.entity_type}{log.entity_id ? ` — ${log.entity_id}` : ''}
-                        {log.new_value?.details ? ` — ${log.new_value.details}` : ''}
+                        {log.collection_name}{log.record_id ? ` - ${log.record_id}` : ''}
+                        {log.new_data?.details ? ` - ${log.new_data.details}` : ''}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {log.created_at ? format(new Date(log.created_at), 'PPp') : '-'}
@@ -306,18 +314,16 @@ export function AdminSettings() {
             </div>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
-              <Label htmlFor="dark-mode" className="cursor-pointer">Dark Mode</Label>
-              <Switch id="dark-mode" />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
-              <Label htmlFor="notifications" className="cursor-pointer">Push Notifications</Label>
-              <Switch id="notifications" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
-              <Label htmlFor="sounds" className="cursor-pointer">Sound Alerts</Label>
-              <Switch id="sounds" />
-            </div>
+            {PREFERENCE_TOGGLES.map((preference) => (
+              <div key={preference.key} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
+                <Label htmlFor={preference.key} className="cursor-pointer">{preference.name}</Label>
+                <Switch
+                  id={preference.key}
+                  checked={localToggles[preference.key] ?? false}
+                  onCheckedChange={(checked) => handleToggleChange(preference.key, checked)}
+                />
+              </div>
+            ))}
           </div>
         </Card>
 

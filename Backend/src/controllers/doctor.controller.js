@@ -1,4 +1,4 @@
-import { AuditLog, Doctor, Slot, User } from '../models/index.js';
+import { AuditLog, Doctor, Slot, SystemSetting, User } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { requireObjectId, serialize } from '../utils/mongo.js';
 import {
@@ -7,8 +7,10 @@ import {
     buildSort,
     getListOptions,
     pagedFind,
+    parseJson,
 } from '../utils/api.js';
 import { cacheKey, getOrSetCache, invalidateCache } from '../services/cache.service.js';
+import { emitQueueEvent } from '../services/realtime.service.js';
 
 const doctorPopulate = [
     { path: 'department_id', select: 'name description capacity floor_number contact_email contact_phone' },
@@ -36,6 +38,7 @@ const writableFields = new Set([
     'available_hours',
     'max_patients_per_day',
     'average_consultation_time',
+    'daily_video_quota',
     'rating',
     'total_reviews',
     'bio',
@@ -43,6 +46,20 @@ const writableFields = new Set([
     'is_available',
     'is_active',
 ]);
+
+function getEmailFilter(query = {}) {
+    const direct = query.email ? String(query.email).trim().toLowerCase() : '';
+    if (direct) return direct;
+
+    for (const item of parseJson(query.filters, [])) {
+        if (!item || item.column !== 'email') continue;
+        if (!['eq', 'ilike'].includes(item.op)) continue;
+        const value = String(item.value || '').replaceAll('%', '').trim().toLowerCase();
+        if (value) return value;
+    }
+
+    return '';
+}
 
 function normalizeDoctorInput(input = {}) {
     const mapped = {
@@ -108,7 +125,8 @@ function serializeDoctor(row) {
         phone: value.phone || user?.phone,
         qualifications: value.qualification ? [value.qualification] : [],
         daily_physical_quota: value.max_patients_per_day || 0,
-        daily_video_quota: Math.max(Math.floor((value.max_patients_per_day || 0) / 3), 0),
+        daily_video_quota:
+            value.daily_video_quota ?? Math.max(Math.floor((value.max_patients_per_day || 0) / 3), 0),
         schedule: value.available_hours,
         department: department
             ? {
@@ -141,6 +159,7 @@ function withRequiredProjectionFields(projection) {
     fields.add('name');
     fields.add('license_number');
     fields.add('max_patients_per_day');
+    fields.add('daily_video_quota');
     fields.add('available_hours');
     return Array.from(fields).join(' ');
 }
@@ -150,6 +169,12 @@ export const getAllDoctors = async (req, res) => {
     const list = getListOptions(req.query);
 
     const filter = buildListFilter(req, { fieldMap: FIELD_MAP });
+    const email = getEmailFilter(req.query);
+    if (email) {
+        const doctorUser = await User.findOne({ email, role: 'doctor', is_active: true }).select('_id').lean();
+        filter.user_id = doctorUser?._id || null;
+    }
+
     if (filter.is_active === undefined) filter.is_active = true;
 
     if (specialty) {
@@ -189,6 +214,7 @@ export const getAllDoctors = async (req, res) => {
         'available_days',
         'available_hours',
         'max_patients_per_day',
+        'daily_video_quota',
         'average_consultation_time',
         'rating',
         'bio',
@@ -267,6 +293,9 @@ export const updateDoctor = async (req, res) => {
     });
     await invalidateCache(['doctors:*', `doctor-schedule:${doctor._id}:*`, 'dashboard:*']);
 
+    // Nudge open admin/management dashboards to refetch doctor capacity/roster.
+    emitQueueEvent('queue.updated', { doctor_id: doctor._id.toString(), reason: 'doctor.updated' });
+
     const data = serializeDoctor(doctor);
     res.status(200).json({ doctor: data, data });
 };
@@ -301,6 +330,11 @@ export const getDoctorsByDepartment = async (req, res) => {
 export const getDoctorSlots = async (req, res) => {
     const doctorId = requireObjectId(req.params.id, 'doctorId');
     const { date, startDate, endDate } = req.query;
+
+    const setting = await SystemSetting.findOne({ setting_key: 'slots_blocked' }).select('setting_value').lean();
+    if (setting?.setting_value?.blocked) {
+        return res.status(200).json({ slots: [], data: [] });
+    }
 
     const filter = {
         doctor_id: doctorId,

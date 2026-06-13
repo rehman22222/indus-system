@@ -137,7 +137,7 @@ export function DoctorHome({
               <div key={apt.id} className={cn(
                 "p-3 md:p-4 flex items-center justify-between gap-2",
                 apt.status === 'in_consultation' && "bg-primary/5"
-              )}>
+              )} data-patient-name={apt.patient?.name || 'Unknown'}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={cn(
                     "h-9 w-9 md:h-10 md:w-10 rounded-xl flex items-center justify-center shrink-0",
@@ -172,7 +172,14 @@ export function DoctorHome({
                       <CheckCircle2 className="h-4 w-4 text-chart-3" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="rounded-lg h-8 w-8" onClick={() => onViewPatient(apt)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-lg h-8 w-8"
+                    onClick={() => onViewPatient(apt)}
+                    aria-label="View patient details"
+                    title="View patient details"
+                  >
                     <Eye className="h-4 w-4" />
                   </Button>
                 </div>

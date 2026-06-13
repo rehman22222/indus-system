@@ -138,6 +138,7 @@ const DoctorSchema = new Schema(
             default: () => ({ start: '09:00', end: '17:00' }),
         },
         max_patients_per_day: { type: Number, default: 20, min: 1 },
+        daily_video_quota: { type: Number, default: 10, min: 0 },
         average_consultation_time: { type: Number, default: 30, min: 1 },
         rating: { type: Number, default: 0, min: 0, max: 5 },
         total_reviews: { type: Number, default: 0, min: 0 },
@@ -179,6 +180,7 @@ const AppointmentSchema = new Schema(
         date: { type: String, required: true, alias: 'appointment_date', index: true },
         time: { type: String, required: true, alias: 'appointment_time' },
         appointment_type: { type: String, enum: ['physical', 'video'], default: 'physical' },
+        visit_type: { type: String, enum: ['new', 'follow_up'], default: 'new' },
         token: { type: String, required: true, unique: true, uppercase: true, trim: true },
         status: {
             type: String,
@@ -188,10 +190,11 @@ const AppointmentSchema = new Schema(
             set: normalizeStatusValue,
         },
         chief_complaint: String,
+        history_summary: String,
         diagnosis: String,
         prescription: String,
         notes: String,
-        no_show_risk_score: { type: Number, alias: 'no_show_score', min: 0, max: 1 },
+        no_show_risk_score: { type: Number, alias: 'no_show_score', min: 0, max: 1, default: 0 },
         governance_status: String,
         governance_notes: String,
         video_room_url: String,
@@ -256,6 +259,27 @@ const MedicalRecordSchema = new Schema(
     timestamps,
 );
 MedicalRecordSchema.index({ patient_id: 1, recorded_date: -1 });
+
+// Patient-uploaded reports / past prescriptions. The file payload is stored as
+// base64 (`data`, select:false so it never loads in list queries) — a
+// self-contained store that needs no external bucket for the FYP demo.
+const MedicalDocumentSchema = new Schema(
+    {
+        patient_id: objectId('User', true),
+        appointment_id: objectId('Appointment'),
+        doctor_id: objectId('Doctor'),
+        kind: { type: String, enum: ['report', 'prescription', 'other'], default: 'report' },
+        title: { type: String, required: true },
+        original_name: String,
+        mime: { type: String, default: 'image/jpeg' },
+        size: { type: Number, default: 0 },
+        data: { type: String, required: true, select: false },
+        uploaded_by: objectId('User'),
+    },
+    { ...timestamps, collection: 'medical_documents' },
+);
+MedicalDocumentSchema.index({ patient_id: 1, created_at: -1 });
+MedicalDocumentSchema.index({ appointment_id: 1, created_at: -1 });
 
 const QueueEntrySchema = new Schema(
     {
@@ -368,6 +392,7 @@ export const Slot = models.Slot || model('Slot', SlotSchema);
 export const Appointment = models.Appointment || model('Appointment', AppointmentSchema);
 export const Prescription = models.Prescription || model('Prescription', PrescriptionSchema);
 export const MedicalRecord = models.MedicalRecord || model('MedicalRecord', MedicalRecordSchema);
+export const MedicalDocument = models.MedicalDocument || model('MedicalDocument', MedicalDocumentSchema);
 export const QueueEntry = models.QueueEntry || model('QueueEntry', QueueEntrySchema);
 export const Notification = models.Notification || model('Notification', NotificationSchema);
 export const OtpVerification =
@@ -385,6 +410,7 @@ export const appModels = [
     Appointment,
     Prescription,
     MedicalRecord,
+    MedicalDocument,
     QueueEntry,
     Notification,
     OtpVerification,

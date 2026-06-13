@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +12,17 @@ import { MongoDB } from '@/integrations/mongodb/client';
 import {
   User, PlayCircle, CheckCircle2, Pill, Plus, Trash2, Loader2, FileText,
   Phone, Mail, MapPin, Heart, AlertTriangle, Activity, Droplets, Shield,
-  Video, Thermometer, StickyNote
+  Video, Thermometer, StickyNote, Paperclip, ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Appointment } from '@/hooks/useAppointments';
 import type { Prescription } from '@/hooks/usePrescriptions';
+import {
+  listMedicalDocuments,
+  openMedicalDocument,
+  type MedicalDocument,
+} from '@/services/documentService';
 
 interface MedicationItem {
   name: string;
@@ -99,6 +104,12 @@ function statusBadgeClass(status: string) {
   return 'bg-slate-800 text-white';
 }
 
+function formatFileSize(size?: number) {
+  if (!size) return 'Size unavailable';
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doctorId, prescriptions, onStartVideo }: PatientDetailDialogProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [diagnosis, setDiagnosis] = useState('');
@@ -116,13 +127,45 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
   const [pastVisits, setPastVisits] = useState<any[]>([]);
   const [loadingPast, setLoadingPast] = useState(false);
   const [pastLoaded, setPastLoaded] = useState(false);
+  const [documents, setDocuments] = useState<MedicalDocument[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  const loadDocuments = useCallback(async () => {
+    if (!appointment?.patient_id) return;
+    setLoadingDocuments(true);
+    try {
+      setDocuments(await listMedicalDocuments(appointment.patient_id));
+    } catch (error) {
+      console.error('Error loading patient documents:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  }, [appointment?.patient_id]);
 
   useEffect(() => {
     setConsultationNotes(appointment?.notes || '');
     setActiveTab('details');
     setPastVisits([]);
     setPastLoaded(false);
-  }, [appointment?.id, appointment?.notes]);
+    setDocuments([]);
+    loadDocuments();
+  }, [appointment?.id, appointment?.notes, loadDocuments]);
+
+  useEffect(() => {
+    if (!appointment?.id || !doctorId) return undefined;
+    const channel = MongoDB
+      .channel(`queue:${doctorId}`)
+      .on('documents.updated', {}, (event: any) => {
+        const payload = event?.payload || event?.new || event;
+        if (!payload?.appointment_id || payload.appointment_id === appointment.id) loadDocuments();
+      })
+      .subscribe();
+
+    return () => {
+      MongoDB.removeChannel(channel);
+    };
+  }, [appointment?.id, doctorId, loadDocuments]);
 
   if (!appointment) return null;
 
@@ -135,6 +178,7 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
   const medicalHistory = formatDisplayValue(patient?.medical_history, '');
   const emergencyContact = formatDisplayValue(patient?.emergency_contact, '');
   const AppointmentTypeIcon = appointment.appointment_type === 'video' ? Video : MapPin;
+  const currentDocuments = documents.filter((document) => document.appointment_id === appointment.id);
 
   const patientPrescriptions = prescriptions.filter(
     (rx: any) =>
@@ -262,6 +306,9 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
                   <AppointmentTypeIcon className="mr-1.5 h-3.5 w-3.5" />
                   {appointment.appointment_type === 'video' ? 'Video' : 'Physical'}
                 </Badge>
+                <Badge variant="outline" className="rounded-full border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700">
+                  {appointment.visit_type === 'follow_up' ? 'Follow-up consultation' : 'Initial consultation'}
+                </Badge>
               </div>
             </div>
           </div>
@@ -301,12 +348,13 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col bg-slate-50">
-          <TabsList className="mx-5 mt-4 grid h-11 grid-cols-5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <TabsList className="mx-5 mt-4 grid h-11 grid-cols-6 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <TabsTrigger value="details" className="rounded-lg text-[11px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">Details</TabsTrigger>
             <TabsTrigger value="vitals" className="rounded-lg text-[11px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">Vitals</TabsTrigger>
             <TabsTrigger value="notes" className="rounded-lg text-[11px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">Notes</TabsTrigger>
             <TabsTrigger value="prescribe" className="rounded-lg text-[11px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">Prescribe</TabsTrigger>
             <TabsTrigger value="history" className="rounded-lg text-[11px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">History</TabsTrigger>
+            <TabsTrigger value="documents" className="rounded-lg text-[10px] font-medium text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm sm:text-xs">Documents</TabsTrigger>
           </TabsList>
 
           <div className="max-h-[56vh] overflow-y-auto">
@@ -324,6 +372,37 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
                     </div>
                   </div>
                 </Card>
+              )}
+              {appointment.history_summary && (
+                <Card className="rounded-xl border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Patient-provided history</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-800">{appointment.history_summary}</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+              {currentDocuments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('documents')}
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary/40"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Paperclip className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-slate-900">Patient attachments</span>
+                      <span className="block text-xs text-slate-500">{currentDocuments.length} file{currentDocuments.length === 1 ? '' : 's'} supplied for this booking</span>
+                    </span>
+                  </span>
+                  <ExternalLink className="h-4 w-4 text-slate-400" />
+                </button>
               )}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact</h4>
@@ -591,6 +670,66 @@ export function PatientDetailDialog({ appointment, onClose, onStatusUpdate, doct
                     </div>
                   )}
                 </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="documents" className="mt-0 space-y-4 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Reports and previous prescriptions</h3>
+                  <p className="mt-1 text-xs text-slate-500">Files uploaded by the patient, newest first</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadDocuments} disabled={loadingDocuments}>
+                  {loadingDocuments ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                </Button>
+              </div>
+
+              {loadingDocuments && documents.length === 0 ? (
+                <div className="p-8 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /></div>
+              ) : documents.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                  <Paperclip className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+                  <p className="text-sm font-semibold text-slate-800">No documents uploaded</p>
+                  <p className="mt-1 text-xs text-slate-500">Patient reports and prescriptions will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {documents.map((document) => {
+                    const belongsToCurrentVisit = document.appointment_id === appointment.id;
+                    return (
+                      <Card key={document.id} className="flex items-center gap-3 rounded-xl border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          {document.kind === 'prescription' ? <Pill className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {document.original_name || document.title}
+                            </p>
+                            {belongsToCurrentVisit && <Badge className="rounded-full text-[10px]">This booking</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {document.kind === 'prescription' ? 'Previous prescription' : 'Medical report'} · {formatFileSize(document.size)} · {formatDateSafe(document.created_at)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={async () => {
+                            try {
+                              await openMedicalDocument(document.id);
+                            } catch (error: any) {
+                              toast({ title: 'Could not open document', description: error.message, variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open
+                        </Button>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
             </TabsContent>
           </div>

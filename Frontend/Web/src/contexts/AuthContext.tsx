@@ -29,7 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const storedToken = localStorage.getItem(TOKEN_KEY);
             if (storedUser) setUserState(JSON.parse(storedUser));
             if (storedToken) setTokenState(storedToken);
-        } catch (_) { }
+        } catch {
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(TOKEN_KEY);
+        }
         setIsLoading(false);
     }, []);
 

@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDoctors, useDoctorByEmail } from '@/hooks/useDoctors';
 import { useDoctorAppointments, useUpdateAppointment } from '@/hooks/useAppointments';
 import { useDoctorPrescriptions } from '@/hooks/usePrescriptions';
-import { MongoDB } from '@/integrations/mongodb/client';
+import { MongoDB, onServerEvent } from '@/integrations/mongodb/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
@@ -80,6 +80,20 @@ export default function DoctorApp() {
   const [videoRoomUrl, setVideoRoomUrl] = useState<string | null>(null);
   const [videoProvider, setVideoProvider] = useState<string>('jitsi');
 
+  // Notify the doctor when a patient declines the incoming video call.
+  useEffect(() => {
+    const off = onServerEvent('call:declined', (payload: { patientName?: string; reason?: string }) => {
+      toast({
+        title: 'Patient declined the call',
+        description: payload?.reason
+          ? `${payload.patientName || 'Patient'}: ${payload.reason}`
+          : `${payload?.patientName || 'The patient'} declined the video consultation.`,
+        variant: 'destructive',
+      });
+    });
+    return off;
+  }, []);
+
   const handleRealLogin = async (email: string, password: string) => {
     const { error } = await signIn(email, password);
     if (error) throw error;
@@ -93,12 +107,38 @@ export default function DoctorApp() {
 
   // Create/join the video room, open the call, and ring the patient.
   const handleJoinVideo = async (apt: Appointment) => {
+    // Reserve the tab while this click still counts as a user gesture. Browsers
+    // commonly block window.open when it is called only after an awaited API request.
+    const callWindow = window.open('about:blank', '_blank');
+    if (callWindow) {
+      callWindow.opener = null;
+      callWindow.document.title = 'Preparing video consultation';
+      callWindow.document.body.style.cssText = 'margin:0;background:#090909;color:#fff;font:16px system-ui;display:grid;place-items:center;height:100vh';
+      callWindow.document.body.textContent = 'Preparing secure video consultation...';
+    }
+
     try {
       const room = await getOrCreateVideoRoom(apt.id);
+      if ((room.provider || '').toLowerCase() === 'webrtc') {
+        if (callWindow) {
+          callWindow.location.replace(room.url);
+          return;
+        }
+
+        // Popup blockers can still intervene. Show a deliberate browser-launch
+        // surface instead of attempting camera access inside an iframe.
+        setVideoApt(apt);
+        setVideoRoomUrl(room.url);
+        setVideoProvider('webrtc');
+        return;
+      }
+
+      callWindow?.close();
       setVideoApt(apt);
       setVideoRoomUrl(room.url);
       setVideoProvider(room.provider || 'jitsi');
     } catch (err: any) {
+      callWindow?.close();
       toast({ title: 'Could not start video', description: err.message, variant: 'destructive' });
       return;
     }

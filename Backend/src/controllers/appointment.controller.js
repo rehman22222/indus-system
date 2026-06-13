@@ -6,6 +6,7 @@ import {
     Notification,
     QueueEntry,
     Slot,
+    SystemSetting,
     User,
 } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -52,8 +53,10 @@ const PROJECTION_FIELDS = [
     'date',
     'time',
     'appointment_type',
+    'visit_type',
     'status',
     'chief_complaint',
+    'history_summary',
     'diagnosis',
     'notes',
     'no_show_risk_score',
@@ -146,15 +149,16 @@ function serializeAppointment(row) {
     const value = serialize(row);
     const patient = value && typeof value.patient_id === 'object' ? value.patient_id : null;
     const doctor = value && typeof value.doctor_id === 'object' ? value.doctor_id : null;
+    const department = value && typeof value.department_id === 'object' ? value.department_id : null;
+    const slot = value && typeof value.slot_id === 'object' ? value.slot_id : null;
 
     return {
         ...value,
         status: normalizeStatusValue(value.status),
         patient_id: patient?.id || value.patient_id,
         doctor_id: doctor?.id || value.doctor_id,
-        department_id:
-            value && typeof value.department_id === 'object' ? value.department_id.id : value.department_id,
-        slot_id: value && typeof value.slot_id === 'object' ? value.slot_id.id : value.slot_id,
+        department_id: department?.id || value.department_id,
+        slot_id: slot?.id || value.slot_id,
         appointment_date: value.date,
         appointment_time: value.time,
         no_show_score: value.no_show_risk_score,
@@ -247,6 +251,17 @@ export const getAppointmentById = async (req, res) => {
     res.status(200).json({ appointment: data, data });
 };
 
+// Management can pause all online (patient self-service) booking via the
+// `slots_blocked` system setting. Staff-created bookings are unaffected.
+async function isOnlineBookingBlocked() {
+    const setting = await SystemSetting.findOne({ setting_key: 'slots_blocked' })
+        .select('setting_value')
+        .maxTimeMS(3000)
+        .lean();
+    const value = setting?.setting_value;
+    return Boolean(value && (value === true || value.blocked === true));
+}
+
 export const createAppointment = async (req, res) => {
     const patientId = requireObjectId(req.body.patientId || req.body.patient_id, 'patientId');
     const doctorId = requireObjectId(req.body.doctorId || req.body.doctor_id, 'doctorId');
@@ -259,10 +274,18 @@ export const createAppointment = async (req, res) => {
     const date = req.body.date || req.body.appointment_date;
     const time = req.body.time || req.body.appointment_time;
     const appointmentType = req.body.appointmentType || req.body.appointment_type || 'physical';
+    const visitTypeInput = String(req.body.visitType || req.body.visit_type || 'new').toLowerCase();
+    const visitType = ['new', 'follow_up'].includes(visitTypeInput) ? visitTypeInput : 'new';
 
     if (!date || !time) throw new AppError('Date and time are required', 400);
     if (req.userRole === 'patient' && req.user.id !== patientId.toString()) {
         throw new AppError('Patients can only book their own appointments', 403);
+    }
+    if (req.userRole === 'patient' && (await isOnlineBookingBlocked())) {
+        throw new AppError(
+            'Online booking is temporarily closed by the hospital. Please try again later or contact reception.',
+            423,
+        );
     }
 
     let createdAppointment;
@@ -279,7 +302,7 @@ export const createAppointment = async (req, res) => {
                 throw new AppError('Doctor not found or inactive', 404);
             }
 
-            if (!departmentId) departmentId = doctor.department_id;
+            departmentId = doctor.department_id;
             if (!departmentId) {
                 throw new AppError('Department is required for appointment booking', 400);
             }
@@ -349,9 +372,11 @@ export const createAppointment = async (req, res) => {
                         time,
                         token,
                         appointment_type: appointmentType,
+                        visit_type: visitType,
                         chief_complaint: req.body.chiefComplaint || req.body.chief_complaint,
+                        history_summary: req.body.historySummary || req.body.history_summary,
                         status: normalizeStatus(req.body.status || 'confirmed'),
-                        no_show_risk_score: req.body.no_show_score || req.body.no_show_risk_score,
+                        no_show_risk_score: req.body.no_show_score ?? req.body.no_show_risk_score ?? 0,
                     },
                 ],
                 { session },
@@ -470,6 +495,15 @@ export const updateAppointment = async (req, res) => {
     const id = requireObjectId(req.params.id, 'appointmentId');
     const updates = { ...req.body };
 
+    if (updates.appointment_date !== undefined) updates.date = updates.appointment_date;
+    if (updates.appointment_time !== undefined) updates.time = updates.appointment_time;
+    if (updates.doctorId !== undefined) updates.doctor_id = updates.doctorId;
+    if (updates.slotId !== undefined) updates.slot_id = updates.slotId;
+    delete updates.appointment_date;
+    delete updates.appointment_time;
+    delete updates.doctorId;
+    delete updates.slotId;
+
     delete updates.id;
     delete updates._id;
     delete updates.created_at;
@@ -478,15 +512,78 @@ export const updateAppointment = async (req, res) => {
     delete updates.patientId;
     delete updates.token;
 
-    if (updates.status) updates.status = normalizeStatus(updates.status);
-
     const filter = await scopedAppointmentFilter(req, { _id: id });
-    const appointment = await Appointment.findOneAndUpdate(filter, updates, {
-        new: true,
-        runValidators: true,
-    }).populate(appointmentPopulate);
+    const current = await Appointment.findOne(filter);
+    if (!current) throw new AppError('Appointment not found', 404);
 
-    if (!appointment) throw new AppError('Appointment not found', 404);
+    if (updates.status) updates.status = normalizeStatus(updates.status);
+    const schedulingChange = updates.doctor_id || updates.date || updates.time || updates.slot_id;
+    if (schedulingChange && !['admin', 'management', 'receptionist'].includes(req.userRole)) {
+        throw new AppError('Only authorized staff can reassign or reschedule appointments', 403);
+    }
+
+    const wasActive = activeStatuses.includes(normalizeStatusValue(current.status));
+    const nextStatus = normalizeStatusValue(updates.status || current.status);
+    const willBeActive = activeStatuses.includes(nextStatus);
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            let targetSlotId = current.slot_id;
+            let targetDoctorId = updates.doctor_id ? requireObjectId(updates.doctor_id, 'doctorId') : current.doctor_id;
+            const targetDate = updates.date || current.date;
+            const targetTime = updates.time || current.time;
+            let slotChanged = false;
+
+            if (schedulingChange) {
+                const doctor = await Doctor.findById(targetDoctorId).select('department_id is_active').session(session).lean();
+                if (!doctor?.is_active) throw new AppError('Target doctor is not active', 409);
+                updates.doctor_id = targetDoctorId;
+                updates.department_id = doctor.department_id;
+
+                const targetSlot = updates.slot_id
+                    ? await Slot.findOne({ _id: requireObjectId(updates.slot_id, 'slotId'), doctor_id: targetDoctorId, date: targetDate, start_time: targetTime }).session(session)
+                    : await Slot.findOne({ doctor_id: targetDoctorId, date: targetDate, start_time: targetTime }).session(session);
+                if (!targetSlot) throw new AppError('No matching slot exists for the selected doctor, date, and time', 409);
+                targetSlotId = targetSlot._id;
+                updates.slot_id = targetSlotId;
+                slotChanged = String(targetSlotId) !== String(current.slot_id);
+
+                if ((slotChanged || !wasActive) && willBeActive) {
+                    const reserved = await Slot.findOneAndUpdate(
+                        { _id: targetSlotId, $expr: { $lt: ['$current_patients', '$max_patients'] } },
+                        [{ $set: { current_patients: { $add: ['$current_patients', 1] }, is_available: { $lt: [{ $add: ['$current_patients', 1] }, '$max_patients'] } } }],
+                        { new: true, session },
+                    );
+                    if (!reserved) throw new AppError('The selected slot is no longer available', 409);
+                }
+            }
+
+            const shouldReleaseOld = wasActive && (!willBeActive || (schedulingChange && String(targetSlotId) !== String(current.slot_id)));
+            if (shouldReleaseOld && current.slot_id) {
+                await Slot.findByIdAndUpdate(
+                    current.slot_id,
+                    [{ $set: { current_patients: { $max: [{ $subtract: ['$current_patients', 1] }, 0] }, is_available: true } }],
+                    { session },
+                );
+            }
+
+            if (!wasActive && willBeActive && !schedulingChange && current.slot_id) {
+                const reserved = await Slot.findOneAndUpdate(
+                    { _id: current.slot_id, $expr: { $lt: ['$current_patients', '$max_patients'] } },
+                    [{ $set: { current_patients: { $add: ['$current_patients', 1] }, is_available: { $lt: [{ $add: ['$current_patients', 1] }, '$max_patients'] } } }],
+                    { new: true, session },
+                );
+                if (!reserved) throw new AppError('The appointment slot is no longer available', 409);
+            }
+
+            Object.assign(current, updates);
+            await current.save({ session, validateModifiedOnly: true });
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    const appointment = await Appointment.findById(current._id).populate(appointmentPopulate);
 
     const normalizedStatus = normalizeStatusValue(appointment.status);
     if (updates.status) {

@@ -18,6 +18,7 @@ import {
 } from '../models/index.js';
 import { normalizeRole, serialize, serializeMany } from '../utils/mongo.js';
 import { normalizeStatusValue } from '../utils/api.js';
+import { invalidateCache } from '../services/cache.service.js';
 
 const router = express.Router();
 
@@ -98,6 +99,7 @@ const FIELD_MAP = {
         license_no: 'license_number',
         qualifications: 'qualification',
         daily_physical_quota: 'max_patients_per_day',
+        daily_video_quota: 'daily_video_quota',
         schedule: 'available_hours',
     },
     notifications: {
@@ -434,7 +436,8 @@ function normalizeDoctor(row) {
         phone: row.phone || user?.phone,
         qualifications: row.qualification ? [row.qualification] : [],
         daily_physical_quota: row.max_patients_per_day || 0,
-        daily_video_quota: Math.max(Math.floor((row.max_patients_per_day || 0) / 3), 0),
+        daily_video_quota:
+            row.daily_video_quota ?? Math.max(Math.floor((row.max_patients_per_day || 0) / 3), 0),
         schedule: row.available_hours,
         department: department
             ? {
@@ -601,8 +604,44 @@ router.get(
 router.post(
     '/rpc/:name',
     authMiddleware,
-    asyncHandler(async (_req, res) => {
-        res.status(200).json({ data: null });
+    asyncHandler(async (req, res) => {
+        const name = String(req.params.name || '');
+        if (name === 'write_audit_log') {
+            const audit = await AuditLog.create({
+                user_id: req.user?.id,
+                action: req.body.p_action || req.body.action || 'system.action',
+                collection_name: req.body.p_entity_type || req.body.collection_name || 'system',
+                record_id: mongoose.Types.ObjectId.isValid(req.body.p_entity_id) ? new mongoose.Types.ObjectId(req.body.p_entity_id) : undefined,
+                old_data: req.body.p_old_value,
+                new_data: req.body.p_new_value,
+                ip_address: req.ip,
+                user_agent: req.get('user-agent'),
+            });
+            return res.status(201).json({ data: serialize(audit) });
+        }
+        if (name === 'generate_daily_slots') {
+            const doctorId = req.body.p_doctor_id;
+            const date = String(req.body.p_date || '');
+            if (!mongoose.Types.ObjectId.isValid(doctorId) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new AppError('Valid doctor and date are required', 400);
+            const blocked = await SystemSetting.findOne({ setting_key: 'slots_blocked' }).select('setting_value').lean();
+            if (blocked?.setting_value?.blocked) return res.status(200).json({ data: { created: 0, blocked: true } });
+            const doctor = await Doctor.findById(doctorId).lean();
+            if (!doctor || !doctor.is_active) throw new AppError('Doctor not found', 404);
+            const day = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            if (doctor.available_days?.length && !doctor.available_days.includes(day)) return res.status(200).json({ data: { created: 0, unavailable: true } });
+            const configured = doctor.available_hours?.[day] || doctor.available_hours || {};
+            const duration = doctor.average_consultation_time || 30;
+            const toMinutes = (time) => { const [hours, minutes] = String(time).split(':').map(Number); return hours * 60 + minutes; };
+            const toTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+            const operations = [];
+            for (let minute = toMinutes(configured.start || '09:00'); minute + duration <= toMinutes(configured.end || '17:00'); minute += duration) {
+                operations.push({ updateOne: { filter: { doctor_id: doctor._id, date, start_time: toTime(minute) }, update: { $setOnInsert: { doctor_id: doctor._id, date, start_time: toTime(minute), end_time: toTime(minute + duration), is_available: true, max_patients: 1, current_patients: 0 } }, upsert: true } });
+            }
+            const result = operations.length ? await Slot.bulkWrite(operations, { ordered: false }) : null;
+            await invalidateCache(['slots:*', `doctor-schedule:${doctorId}:*`]);
+            return res.status(200).json({ data: { created: result?.upsertedCount || 0 } });
+        }
+        throw new AppError(`Unknown operation: ${name}`, 404);
     }),
 );
 

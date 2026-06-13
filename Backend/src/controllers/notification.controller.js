@@ -5,6 +5,9 @@ import { buildListFilter, buildProjection, buildSort, getListOptions, pagedFind 
 import { invalidateCache } from '../services/cache.service.js';
 import { isPushReady } from '../services/push.service.js';
 import { enqueueNotification } from '../services/notificationQueue.service.js';
+import { emitToUser } from '../services/realtime.service.js';
+
+const BROADCAST_ROLES = new Set(['admin', 'management', 'doctor', 'patient', 'receptionist']);
 
 function fcmTokenFor(user) {
     return user?.fcm_token || user?.push_tokens?.find((item) => item.provider === 'fcm' && item.token)?.token;
@@ -102,6 +105,59 @@ export const updateNotification = async (req, res) => {
 export const createNotification = async (req, res) => {
     const rows = Array.isArray(req.body) ? req.body : [req.body];
     if (rows.length === 0) throw new AppError('Notification payload is required', 400);
+
+    // Broadcast: a single payload with no recipient but is_broadcast / target_role
+    // set. Fan it out to every active user of the target role (or everyone) so a
+    // management announcement actually lands in each user's notification list.
+    const head = rows[0] || {};
+    const isBroadcast =
+        rows.length === 1 &&
+        !head.userId &&
+        !head.user_id &&
+        (head.is_broadcast || head.isBroadcast || head.target_role || head.targetRole);
+
+    if (isBroadcast) {
+        const title = head.title;
+        const body = head.body || head.message;
+        if (!title || !body) throw new AppError('Notification title and body are required', 400);
+
+        const role = String(head.target_role || head.targetRole || 'all').toLowerCase();
+        const userFilter = { is_active: true };
+        if (role !== 'all') {
+            if (!BROADCAST_ROLES.has(role)) throw new AppError(`Unknown target role: ${role}`, 400);
+            userFilter.role = role;
+        }
+
+        const recipients = await User.find(userFilter).select('_id').lean().maxTimeMS(8000);
+        if (recipients.length === 0) throw new AppError('No active recipients for this broadcast', 404);
+
+        const now = new Date();
+        const docs = recipients.map((u) => ({
+            user_id: u._id,
+            title,
+            body,
+            data: { ...(head.data || {}), broadcast: true, target_role: role },
+            read: false,
+            sent_at: now,
+        }));
+
+        const created = await Notification.insertMany(docs, { ordered: false });
+        await invalidateCache(['notifications:*', 'dashboard:*']);
+
+        // Best-effort live ping to any connected recipients.
+        for (const u of recipients) {
+            emitToUser(u._id.toString(), 'notification:new', { title, body, broadcast: true });
+        }
+
+        const data = serializeNotifications(created.slice(0, 1));
+        return res.status(201).json({
+            message: `Broadcast delivered to ${created.length} ${role === 'all' ? 'users' : `${role}s`}`,
+            count: created.length,
+            notifications: data,
+            notification: data[0] || null,
+            data: data[0] || null,
+        });
+    }
 
     const payload = rows.map((row) => ({
         user_id: requireObjectId(row.userId || row.user_id, 'userId'),

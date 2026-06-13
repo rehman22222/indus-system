@@ -32,6 +32,7 @@ import patientRoutes from './routes/patient.routes.js';
 import queueRoutes from './routes/queue.routes.js';
 import slotRoutes from './routes/slot.routes.js';
 import prescriptionRoutes from './routes/prescription.routes.js';
+import documentRoutes from './routes/document.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import managementRoutes from './routes/management.routes.js';
 
@@ -145,6 +146,7 @@ app.use('/api/v1/patients', patientRoutes);
 app.use('/api/v1/queue', queueRoutes);
 app.use('/api/v1/slots', slotRoutes);
 app.use('/api/v1/prescriptions', prescriptionRoutes);
+app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/management', managementRoutes);
 // Kept intentionally as an undo/legacy compatibility fallback while the UI

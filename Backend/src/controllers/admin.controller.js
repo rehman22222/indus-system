@@ -1,8 +1,11 @@
 import {
     Appointment,
     AuditLog,
+    Department,
     Doctor,
+    MedicalRecord,
     Notification,
+    Prescription,
     QueueEntry,
     Slot,
     SystemSetting,
@@ -10,8 +13,9 @@ import {
 } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { requireObjectId, serialize, serializeMany } from '../utils/mongo.js';
-import { buildProjection, buildSort, getListOptions, pagedFind } from '../utils/api.js';
+import { buildProjection, buildSort, getListOptions, pagedFind, parseJson } from '../utils/api.js';
 import { cacheKey, getOrSetCache, invalidateCache } from '../services/cache.service.js';
+import { hashPassword } from '../services/password.service.js';
 
 function serializeSetting(row) {
     const value = serialize(row);
@@ -112,10 +116,90 @@ export const createAuditLog = async (req, res) => {
     res.status(201).json({ auditLog: data, data });
 };
 
+export const createSystemBackup = async (req, res) => {
+    const generatedAt = new Date();
+    const [users, departments, doctors, slots, appointments, prescriptions, medicalRecords, queue, notifications, settings] = await Promise.all([
+        User.find({}).select('-password_hash -fcm_token -push_tokens').lean(),
+        Department.find({}).lean(),
+        Doctor.find({}).lean(),
+        Slot.find({}).lean(),
+        Appointment.find({}).lean(),
+        Prescription.find({}).lean(),
+        MedicalRecord.find({}).lean(),
+        QueueEntry.find({}).lean(),
+        Notification.find({}).lean(),
+        SystemSetting.find({}).lean(),
+    ]);
+
+    const backup = {
+        schema_version: 1,
+        generated_at: generatedAt.toISOString(),
+        database: 'doctorappointment',
+        collections: {
+            users: serializeMany(users),
+            departments: serializeMany(departments),
+            doctors: serializeMany(doctors),
+            slots: serializeMany(slots),
+            appointments: serializeMany(appointments),
+            prescriptions: serializeMany(prescriptions),
+            medical_records: serializeMany(medicalRecords),
+            queue: serializeMany(queue),
+            notifications: serializeMany(notifications),
+            system_settings: serializeMany(settings),
+        },
+    };
+
+    await SystemSetting.findOneAndUpdate(
+        { setting_key: 'last_backup' },
+        {
+            setting_key: 'last_backup',
+            setting_value: generatedAt.toISOString(),
+            description: 'Last successful logical database backup',
+            updated_by: req.user?.id,
+        },
+        { upsert: true, new: true, runValidators: true },
+    );
+    await AuditLog.create({
+        user_id: req.user?.id,
+        action: 'backup.created',
+        collection_name: 'system',
+        new_data: {
+            generated_at: generatedAt.toISOString(),
+            record_counts: Object.fromEntries(
+                Object.entries(backup.collections).map(([name, rows]) => [name, rows.length]),
+            ),
+        },
+        ip_address: req.ip,
+        user_agent: req.get('user-agent'),
+    });
+    await invalidateCache(['dashboard:*', 'admin:*']);
+
+    res.status(200).json({
+        message: 'Logical backup generated successfully',
+        filename: `indus_backup_${generatedAt.toISOString().replace(/[:.]/g, '-')}.json`,
+        backup,
+        data: backup,
+    });
+};
+
+function settingKeyFromQuery(query = {}) {
+    const direct = query.key || query.setting_key;
+    if (direct) return String(direct);
+    for (const item of parseJson(query.filters, [])) {
+        if (item && (item.column === 'key' || item.column === 'setting_key') && item.op === 'eq' && item.value) {
+            return String(item.value);
+        }
+    }
+    return '';
+}
+
 export const listSystemSettings = async (req, res) => {
     const list = getListOptions(req.query);
     const filter = {};
     if (req.query.public !== undefined) filter.is_public = req.query.public === 'true';
+
+    const settingKey = settingKeyFromQuery(req.query);
+    if (settingKey) filter.setting_key = settingKey;
 
     const { items, pagination } = await pagedFind(SystemSetting, filter, {
         ...list,
@@ -160,4 +244,70 @@ export const updateSystemSetting = async (req, res) => {
     await invalidateCache(['dashboard:*', 'admin:*']);
     const data = serializeSetting(setting);
     res.status(200).json({ setting: data, data });
+};
+
+const STAFF_ROLES = new Set(['admin', 'management', 'doctor', 'receptionist']);
+
+export const createStaffAccount = async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const name = String(req.body.name || req.body.fullName || req.body.full_name || '').trim();
+    const role = String(req.body.role || '').trim().toLowerCase();
+
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new AppError('Valid email is required', 400);
+    if (password.length < 6) throw new AppError('Password must be at least 6 characters', 400);
+    if (!name) throw new AppError('Full name is required', 400);
+    if (!STAFF_ROLES.has(role)) throw new AppError('Invalid staff role', 400);
+
+    const user = await User.findOneAndUpdate(
+        { email },
+        {
+            email,
+            name,
+            phone: req.body.phone || undefined,
+            role,
+            password_hash: await hashPassword(password),
+            auth_provider: 'password',
+            is_active: true,
+        },
+        { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
+    );
+
+    let doctor = null;
+    if (role === 'doctor') {
+        const departmentId = requireObjectId(req.body.departmentId || req.body.department_id, 'departmentId');
+        doctor = await Doctor.findOneAndUpdate(
+            { user_id: user._id },
+            {
+                user_id: user._id,
+                name,
+                specialty: String(req.body.specialty || 'General Medicine').trim(),
+                department_id: departmentId,
+                license_number: req.body.license_number || req.body.license_no || `PMC-${Date.now()}`,
+                max_patients_per_day: Number(req.body.dailyPhysicalQuota ?? req.body.daily_physical_quota ?? 30),
+                daily_video_quota: Number(req.body.dailyVideoQuota ?? req.body.daily_video_quota ?? 10),
+                is_active: true,
+                is_available: true,
+            },
+            { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
+        );
+    }
+
+    await AuditLog.create({
+        user_id: req.user?.id,
+        action: 'staff_account.created',
+        collection_name: 'users',
+        record_id: user._id,
+        new_data: { email, name, role, doctor_id: doctor?._id },
+        ip_address: req.ip,
+        user_agent: req.get('user-agent'),
+    });
+    await invalidateCache(['doctors:*', 'users:*', 'dashboard:*']);
+
+    res.status(201).json({
+        message: `${role} account created`,
+        user: { id: user._id.toString(), email: user.email, name: user.name, role: user.role },
+        doctor: doctor ? serialize(doctor) : null,
+        data: { userId: user._id.toString(), doctorId: doctor?._id?.toString?.() },
+    });
 };

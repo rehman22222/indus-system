@@ -78,8 +78,10 @@ export const env = Object.freeze({
     CORS_ORIGINS: corsOrigins,
     ANALYTICS_API_URL: optional('ANALYTICS_API_URL', 'http://localhost:8000'),
 
-    // Video consultation provider: 'jitsi' (free, no API key — default) or 'daily'.
-    VIDEO_PROVIDER: optional('VIDEO_PROVIDER', 'jitsi').toLowerCase(),
+    // Appointment-scoped browser WebRTC is the default. Jitsi and Daily are
+    // retained as optional fallbacks for existing deployments.
+    VIDEO_PROVIDER: optional('VIDEO_PROVIDER', 'webrtc').toLowerCase(),
+    CALL_WEB_BASE_URL: optional('CALL_WEB_BASE_URL', 'http://localhost:5173'),
     JITSI_BASE_URL: optional('JITSI_BASE_URL', 'https://meet.jit.si'),
 
     REDIS_URL: optional('REDIS_URL', ''),

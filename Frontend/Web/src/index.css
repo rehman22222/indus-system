@@ -30,8 +30,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 12%;
 
-    /* Alizarin Crimson #E9242B -> HSL(357, 82%, 53%) - used sparingly */
-    --primary: 357 82% 53%;
+    /* INDUS Hospital red #BE1E2D -> HSL(354, 73%, 43%) */
+    --primary: 354 73% 43%;
     --primary-foreground: 0 0% 100%;
 
     /* Softer secondary - very light gray with slight warmth */
@@ -50,23 +50,23 @@
 
     --border: 0 0% 92%;
     --input: 0 0% 92%;
-    --ring: 357 82% 53%;
+    --ring: 354 73% 43%;
 
     --radius: 0.75rem;
 
     /* Sidebar - keep brand color but cleaner */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 0 0% 20%;
-    --sidebar-primary: 357 82% 53%;
+    --sidebar-primary: 354 73% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 96%;
     --sidebar-accent-foreground: 0 0% 20%;
     --sidebar-border: 0 0% 92%;
-    --sidebar-ring: 357 82% 53%;
+    --sidebar-ring: 354 73% 43%;
 
     /* Chart colors - more muted */
-    --chart-1: 357 70% 50%;
-    --chart-2: 220 60% 55%;
+    --chart-1: 354 73% 43%;
+    --chart-2: 215 55% 30%;
     --chart-3: 160 55% 45%;
     --chart-4: 45 80% 55%;
     --chart-5: 280 55% 55%;
