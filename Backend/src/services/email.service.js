@@ -26,6 +26,42 @@ function smtpConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
+/**
+ * Send via Brevo's transactional email HTTP API (https://api.brevo.com).
+ * Uses HTTPS (port 443), so it works on hosts that block outbound SMTP — e.g.
+ * Render free/starter. Only the sender email needs to be a verified Brevo
+ * sender; recipients can be anyone.
+ */
+async function sendViaBrevo({ to, subject, html, fromName, fromEmail }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) throw new Error('BREVO_API_KEY is not configured');
+
+  const recipients = (Array.isArray(to) ? to : [to])
+    .filter(Boolean)
+    .map((email) => ({ email }));
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': apiKey,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: fromName, email: fromEmail },
+      to: recipients,
+      subject,
+      htmlContent: html,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Brevo send failed (${response.status}): ${data.message || data.code || 'unknown error'}`);
+  }
+  return { id: data.messageId };
+}
+
 function getSmtpTransporter() {
   if (!smtpConfigured()) throw new Error('SMTP credentials are not configured');
   if (!smtpTransporter) {
@@ -35,6 +71,12 @@ function getSmtpTransporter() {
       port,
       secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // Fail fast instead of hanging when outbound SMTP is blocked (e.g. Render
+      // free/starter blocks ports 25/465/587). Surfaces a clear error in ~10s so
+      // the caller can fall back / report, rather than the request stalling.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
   return smtpTransporter;
@@ -44,6 +86,11 @@ async function sendEmail({ to, subject, html }) {
   const fromName = process.env.OTP_FROM_NAME || 'INDUS Hospital';
   const fromEmail = process.env.OTP_FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev';
   const provider = String(process.env.EMAIL_PROVIDER || 'auto').toLowerCase();
+
+  // Brevo (HTTPS API) — preferred on hosts that block outbound SMTP (Render).
+  if (provider === 'brevo' || (provider === 'auto' && process.env.BREVO_API_KEY)) {
+    return sendViaBrevo({ to, subject, html, fromName, fromEmail });
+  }
 
   if (provider === 'smtp' || (provider === 'auto' && smtpConfigured())) {
     return getSmtpTransporter().sendMail({
