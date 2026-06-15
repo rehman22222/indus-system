@@ -95,6 +95,15 @@ export const env = Object.freeze({
     REDIS_URL: optional('REDIS_URL', ''),
     SOCKET_IO_REDIS_URL: optional('SOCKET_IO_REDIS_URL', optional('REDIS_URL', '')),
     CACHE_ENABLED: bool('CACHE_ENABLED', true),
+
+    // Appointment reminder scheduler. Fires push + in-app reminders 2h before,
+    // 30m before, and at the appointment start time. CLINIC_UTC_OFFSET_MINUTES
+    // interprets the stored (naive) date/time as clinic-local time so reminders
+    // are correct regardless of the server's own timezone (e.g. UTC on Render).
+    // Default 300 = PKT (UTC+5).
+    REMINDER_SCHEDULER_ENABLED: bool('REMINDER_SCHEDULER_ENABLED', true),
+    REMINDER_CHECK_INTERVAL_SECONDS: number('REMINDER_CHECK_INTERVAL_SECONDS', 60, { min: 15, max: 3600 }),
+    CLINIC_UTC_OFFSET_MINUTES: number('CLINIC_UTC_OFFSET_MINUTES', 300, { min: -720, max: 840 }),
     CACHE_DEFAULT_TTL_SECONDS: number('CACHE_DEFAULT_TTL_SECONDS', 60, { min: 1, max: 86400 }),
 
     // Horizontal/vertical scaling and process management.

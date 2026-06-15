@@ -206,6 +206,10 @@ const AppointmentSchema = new Schema(
         consultation_start_time: Date,
         consultation_end_time: Date,
         completed_at: Date,
+        // Reminder windows already dispatched for this appointment (keys: '2h',
+        // '30m', 'start'). The reminder scheduler claims each key atomically so a
+        // window fires exactly once, even with multiple server instances running.
+        reminders_sent: { type: [String], default: undefined },
     },
     timestamps,
 );

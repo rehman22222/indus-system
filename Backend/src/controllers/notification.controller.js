@@ -274,6 +274,52 @@ export const sendNotification = async (req, res) => {
     });
 };
 
+/**
+ * POST /api/v1/notifications/test
+ * Send a test push to the *authenticated* user's own device. Lets anyone logged
+ * in on the APK confirm FCM delivery end-to-end without waiting for a reminder.
+ */
+export const sendTestNotification = async (req, res) => {
+    const user = await User.findById(req.user.id).select('fcm_token push_tokens name');
+    if (!user) throw new AppError('User not found', 404);
+
+    const fcmToken = fcmTokenFor(user);
+    const title = String(req.body.title || 'INDUS Hospital test notification');
+    const body = String(
+        req.body.body || `Hi ${user.name || 'there'} — push notifications are working on this device.`,
+    );
+
+    const notification = await Notification.create({
+        user_id: user._id,
+        title,
+        body,
+        data: { type: 'test' },
+        sent_at: new Date(),
+    });
+    await invalidateCache(['notifications:*', 'dashboard:*']);
+    emitToUser(user._id.toString(), 'notification:new', { title, body, data: { type: 'test' } });
+
+    const willPush = Boolean(fcmToken) && isPushReady();
+    if (willPush) {
+        await enqueueNotification({
+            type: 'push',
+            token: fcmToken,
+            title,
+            body,
+            data: { type: 'test' },
+            notificationId: notification._id.toString(),
+        });
+    }
+
+    res.status(202).json({
+        message: 'Test notification queued',
+        delivery: willPush ? 'push_queued' : 'stored_only',
+        pushReady: isPushReady(),
+        hasDeviceToken: Boolean(fcmToken),
+        data: serialize(notification),
+    });
+};
+
 export const sendBulkNotification = async (req, res) => {
     const userIds = req.body.userIds || req.body.user_ids;
     const { title, body, data = {} } = req.body;

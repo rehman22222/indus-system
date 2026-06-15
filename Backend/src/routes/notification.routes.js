@@ -9,6 +9,7 @@ import {
     registerDeviceToken,
     sendNotification,
     sendBulkNotification,
+    sendTestNotification,
     updateNotification,
 } from '../controllers/notification.controller.js';
 
@@ -22,6 +23,10 @@ router.post(
     asyncHandler(createNotification),
 );
 router.patch('/:id', authMiddleware, asyncHandler(updateNotification));
+
+// Self-test: any authenticated user can push a test notification to their own
+// device to confirm FCM is delivering (used to verify the APK end-to-end).
+router.post('/test', authMiddleware, asyncHandler(sendTestNotification));
 
 router.post(
     '/register-device',

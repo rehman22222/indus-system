@@ -9,6 +9,7 @@ import {
   Loader2,
   PanelRightClose,
   PanelRightOpen,
+  PhoneOff,
   Plus,
   Save,
   ShieldCheck,
@@ -148,6 +149,7 @@ export default function VideoCallRoom() {
   const [connected, setConnected] = useState(false);
   const [agoraCredentials, setAgoraCredentials] = useState<AgoraCredentials | null>(null);
   const [ended, setEnded] = useState(false);
+  const [declined, setDeclined] = useState<{ reason: string; name: string } | null>(null);
   const [clinical, setClinical] = useState<ClinicalContext | null>(null);
   const [clinicalError, setClinicalError] = useState('');
   const [panelOpen, setPanelOpen] = useState(true);
@@ -213,6 +215,24 @@ export default function VideoCallRoom() {
     const timer = window.setTimeout(returnToPatientApp, 700);
     return () => window.clearTimeout(timer);
   }, [call?.role, ended, returnToPatientApp, returnUrl]);
+
+  // Doctor only: watch for the patient declining the ring — even before the
+  // doctor has tapped "Join consultation". When it arrives we cut the call
+  // (camera/mic off) and surface the patient's reason on this tab.
+  useEffect(() => {
+    if (!isDoctor || !call || !token) return undefined;
+    const watcher = io(API_BASE_URL, { auth: { token }, transports: ['websocket', 'polling'] });
+    const onDeclined = (payload: { appointmentId?: string; reason?: string; patientName?: string }) => {
+      if (payload?.appointmentId && payload.appointmentId !== call.appointmentId) return;
+      setDeclined({ reason: payload?.reason || '', name: payload?.patientName || 'The patient' });
+      finishCall();
+    };
+    watcher.on('call:declined', onDeclined);
+    return () => {
+      watcher.off('call:declined', onDeclined);
+      watcher.disconnect();
+    };
+  }, [isDoctor, call, token, finishCall]);
 
   useEffect(() => {
     if (!call || !token) {
@@ -351,11 +371,29 @@ export default function VideoCallRoom() {
     return (
       <main className="grid min-h-[100dvh] place-items-center bg-neutral-950 px-6 text-white">
         <div className="max-w-md text-center">
-          <ShieldCheck className="mx-auto mb-5 h-12 w-12 text-emerald-400" />
-          <h1 className="text-2xl font-semibold">Consultation ended</h1>
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            The call has ended for both participants. Camera and microphone are now off.
-          </p>
+          {declined ? (
+            <>
+              <PhoneOff className="mx-auto mb-5 h-12 w-12 text-red-400" />
+              <h1 className="text-2xl font-semibold">Call declined</h1>
+              <p className="mt-3 text-sm leading-6 text-neutral-300">
+                {declined.name} declined the video consultation. The call has been ended.
+              </p>
+              {declined.reason && (
+                <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.05] p-4 text-left">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Reason from patient</p>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-white">{declined.reason}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="mx-auto mb-5 h-12 w-12 text-emerald-400" />
+              <h1 className="text-2xl font-semibold">Consultation ended</h1>
+              <p className="mt-3 text-sm leading-6 text-neutral-300">
+                The call has ended for both participants. Camera and microphone are now off.
+              </p>
+            </>
+          )}
           <button
             type="button"
             onClick={call?.role === 'patient' && returnUrl ? returnToPatientApp : () => window.close()}

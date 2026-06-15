@@ -16,6 +16,11 @@ import {
     stopNotificationWorker,
     notificationQueueStatus,
 } from './services/notificationQueue.service.js';
+import {
+    startReminderScheduler,
+    stopReminderScheduler,
+    reminderSchedulerStatus,
+} from './services/reminderScheduler.service.js';
 import { HybridRateLimitStore } from './middleware/rateLimitStore.js';
 
 // Import routes
@@ -114,6 +119,7 @@ app.get('/health', (req, res) => {
     const cache = cacheStatus();
     const realtime = realtimeStatus();
     const notifications = notificationQueueStatus();
+    const reminders = reminderSchedulerStatus();
 
     res.status(200).json({
         status: database.readyState === 1 ? 'healthy' : 'degraded',
@@ -125,6 +131,7 @@ app.get('/health', (req, res) => {
         cache,
         realtime,
         notifications,
+        reminders,
         redis: {
             cache: cache.redisReady,
             socketAdapter: realtime.redisAdapterReady,
@@ -198,6 +205,7 @@ async function startServer() {
 
     await initRealtime(server);
     await startNotificationWorker();
+    startReminderScheduler();
 }
 
 let shuttingDown = false;
@@ -218,6 +226,7 @@ async function shutdown(signal) {
         if (server) {
             await new Promise((resolve) => server.close(resolve));
         }
+        stopReminderScheduler();
         await stopNotificationWorker();
         await disconnectCache();
         await disconnectMongoDB();

@@ -122,20 +122,22 @@ export default function DoctorApp() {
       const room = await getOrCreateVideoRoom(apt.id);
       const provider = (room.provider || 'webrtc').toLowerCase();
 
-      // Agora runs natively in-portal (the doctor's browser at localhost/https is
-      // already a secure context) — render the embedded AgoraCall, don't open the
-      // external /video-call page (which needs the patient-facing HTTPS tunnel).
-      if (provider !== 'agora' && ['webrtc', 'jitsi'].includes(provider)) {
+      // Open the full consultation page (/video-call), which embeds the Agora
+      // video AND the clinical workspace (patient history, reports, prescription).
+      // The doctor's room.url uses DOCTOR_CALL_WEB_BASE_URL (localhost/https) — a
+      // secure context — so camera/mic and the side panel all work there.
+      if (['webrtc', 'jitsi', 'agora'].includes(provider)) {
         if (callWindow) {
           callWindow.location.replace(room.url);
           return;
         }
 
-        // Popup blockers can still intervene. Show a deliberate browser-launch
-        // surface instead of attempting camera access inside an iframe.
+        // Popup blockers can still intervene. Fall back to the in-portal overlay
+        // (Agora keeps its credentials so the embedded call still connects).
         setVideoApt(apt);
         setVideoRoomUrl(room.url);
         setVideoProvider(provider);
+        setVideoRoom(room);
         return;
       }
 

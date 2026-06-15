@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "APP_ENV": "development",
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.45:5000",
+        "EXPO_PUBLIC_API_BASE_URL": "https://indus-system.onrender.com",
         "EXPO_PUBLIC_APP_NAME": "Indus Hospital"
       }
     },
@@ -20,14 +20,16 @@
       },
       "env": {
         "APP_ENV": "preview",
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.45:5000",
+        "EXPO_PUBLIC_API_BASE_URL": "https://indus-system.onrender.com",
         "EXPO_PUBLIC_APP_NAME": "Indus Hospital"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://indus-system.onrender.com",
+        "EXPO_PUBLIC_APP_NAME": "Indus Hospital"
       }
     }
   },

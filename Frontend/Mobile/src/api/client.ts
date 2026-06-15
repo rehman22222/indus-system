@@ -14,7 +14,10 @@ type RequestOptions = RequestInit & {
   auth?: boolean;
 };
 
-const REQUEST_TIMEOUT_MS = 15000;
+// A deployed server (https, e.g. Render free tier) can cold-start for ~50s after
+// idle, so allow a generous budget there; LAN dev stays snappy.
+const IS_REMOTE = /^https:\/\//i.test(env.apiBaseUrl);
+const REQUEST_TIMEOUT_MS = IS_REMOTE ? 65000 : 15000;
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -35,7 +38,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const aborted = (error as Error)?.name === 'AbortError';
     throw new Error(
       aborted
-        ? `Can't reach the server at ${env.apiBaseUrl}. Make sure the phone and PC are on the same Wi-Fi and the backend port (5000) is allowed through the firewall.`
+        ? (IS_REMOTE
+            ? 'The server is waking up (free hosting sleeps when idle). Please wait a few seconds and tap again.'
+            : `Can't reach the server at ${env.apiBaseUrl}. Make sure the phone and PC are on the same Wi-Fi and the backend port (5000) is allowed through the firewall.`)
         : `Network error reaching ${env.apiBaseUrl}: ${(error as Error)?.message || 'unknown'}`,
     );
   } finally {
