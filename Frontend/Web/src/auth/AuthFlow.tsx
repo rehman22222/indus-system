@@ -7,22 +7,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ArrowLeft, CalendarDays, ShieldCheck, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import indusLogo from '@/assets/indus-logo.svg';
-import { authStore } from './authStore';
 import { MongoDB } from '@/integrations/mongodb/client';
 import { useOTP } from '@/hooks/useOTP';
 import { OTPInput } from '@/components/OTPInput';
-import { roleFromEmail } from '@/lib/roleFromEmail';
 
 // =================================================================
-// AuthFlow — PATIENT self-service auth on real MongoDB Auth, plus a
-// fallback to the in-memory authStore for STAFF (who have no MongoDB
-// account).
+// AuthFlow — backend-backed authentication for patients and staff.
 //
 //   login (password) ──────────────▶ MongoDB signInWithPassword
-//        │  └─ staff fallback ─────▶ authStore.login
 //        ├─"create account"─▶ signup ─▶ signUp ─▶ otp ─▶ success ─▶ login
 //        └─"forgot password"─▶ forgot ─▶ otp ─▶ updateUser ─▶ success
 //
@@ -48,10 +43,6 @@ interface PendingSignup {
   cnic: string;
   age: number;
   gender: string;
-  // Only set when the edge function ran in OTP_DEV_MODE. Carried into
-  // SignupOtpView so the code box can be auto-filled for fast local
-  // testing without depending on email delivery.
-  devOtp?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -158,14 +149,45 @@ export function AuthFlow() {
   const [successMsg, setSuccessMsg] = useState('Account created successfully!');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-6 animate-slide-down">
-          <img src={indusLogo} alt="Indus Hospital" className="h-12 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Smart Healthcare Management</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center px-4 py-6 md:px-8">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-card shadow-[0_24px_70px_rgba(15,30,51,0.14)] md:grid-cols-[0.9fr_1.1fr] animate-fade-in">
+        <aside className="brand-panel relative hidden min-h-[650px] flex-col justify-between overflow-hidden p-9 text-white md:flex">
+          <div>
+            <div className="inline-flex rounded-2xl bg-white px-4 py-3 shadow-lg">
+              <img src={indusLogo} alt="Indus Hospital" className="h-11 w-auto" />
+            </div>
+            <div className="mt-10 max-w-sm">
+              <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-white/60">Digital Care Portal</p>
+              <h1 className="mt-3 text-4xl font-extrabold leading-tight">Your healthcare journey, connected.</h1>
+              <p className="mt-4 text-sm leading-6 text-white/70">Appointments, consultations, records, and prescriptions in one secure place.</p>
+            </div>
+          </div>
 
-        <Card className="p-5 md:p-8 rounded-3xl border shadow-lg animate-scale-in">
+          <div className="grid gap-3">
+            {[
+              { icon: CalendarDays, text: 'Book and manage appointments' },
+              { icon: Video, text: 'Join secure video consultations' },
+              { icon: ShieldCheck, text: 'Protected patient information' },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10"><Icon className="h-4 w-4" /></span>
+                <span className="text-sm font-semibold text-white/90">{text}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="flex flex-col justify-center p-4 sm:p-7 md:p-10">
+          <div className="mb-5 text-center md:hidden animate-slide-down">
+            <div className="brand-panel rounded-3xl px-5 py-5 shadow-[0_14px_32px_rgba(18,38,67,0.2)]">
+              <div className="inline-flex rounded-xl bg-white px-3 py-2">
+                <img src={indusLogo} alt="Indus Hospital" className="h-9 w-auto" />
+              </div>
+              <p className="mt-3 text-xs font-semibold text-white/70">Smart Healthcare Management</p>
+            </div>
+          </div>
+
+          <Card className="border-0 p-3 shadow-none sm:p-5 md:p-0 animate-scale-in">
           {step === 'login' && (
             <LoginView
               onSignup={() => setStep('signup')}
@@ -215,11 +237,9 @@ export function AuthFlow() {
           {step === 'success' && (
             <SuccessView message={successMsg} onDone={() => setStep('login')} />
           )}
-        </Card>
-
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Web portal demo login - admin@gmail.com - password 123456
-        </p>
+          </Card>
+          <p className="mt-5 text-center text-[11px] font-medium text-muted-foreground">INDUS Hospital & Health Network · Secure care portal</p>
+        </div>
       </div>
     </div>
   );
@@ -252,25 +272,15 @@ function LoginView({
 
     setSubmitting(true);
     try {
-      // 1. Patients → real MongoDB session (persisted; AuthGate routes).
       const { data, error } = await MongoDB.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
       if (!error && data.session) {
         toast.success('Signed in.');
-        return; // onAuthStateChange + AuthGate take over.
-      }
-
-      // 2. Staff have no MongoDB account → in-memory authStore.
-      const staff = authStore.login(email.trim(), password);
-      if ('error' in staff) {
-        setFormError(
-          error ? errMessage(error, 'Invalid email or password.') : staff.error,
-        );
         return;
       }
-      // Staff session set → AuthGate routes by role.
+      setFormError(error ? errMessage(error, 'Invalid email or password.') : 'Invalid email or password.');
     } catch (err) {
       setFormError(errMessage(err, 'Login failed. Please try again.'));
     } finally {
@@ -333,7 +343,10 @@ function LoginView({
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        Patient accounts are created and used from the mobile app.
+        New patient?{' '}
+        <button type="button" onClick={onSignup} className="font-semibold text-primary hover:underline">
+          Create patient account
+        </button>
       </p>
     </form>
   );
@@ -396,11 +409,7 @@ function SignupView({
         setFormError(result.error ?? 'Could not send the verification code.');
         return;
       }
-      if (result.devOtp) {
-        toast.success(`Dev mode: code is ${result.devOtp} (auto-filled).`);
-      } else {
-        toast.success(`A 6-digit code was sent to ${email}.`);
-      }
+      toast.success(`A 6-digit code was sent to ${email}.`);
       onOtpSent({
         email,
         password: values.password,
@@ -409,7 +418,6 @@ function SignupView({
         cnic: values.cnic.trim(),
         age: Number(values.age),
         gender: values.gender,
-        devOtp: result.devOtp,
       });
     } catch (err) {
       setFormError(errMessage(err, 'Could not create the account.'));
@@ -608,9 +616,7 @@ function SignupOtpView({
 }) {
   const { sendOTP, verifyOTP } = useOTP();
   const email = signup.email;
-  // Auto-fill the code when the edge function ran in dev mode so the
-  // developer can complete signup with one click of Verify.
-  const [code, setCode] = useState(signup.devOtp ?? '');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(60);
@@ -635,53 +641,20 @@ function SignupOtpView({
       setSubmitting(true);
       try {
         // 1. Verify the custom OTP.
-        const result = await verifyOTP(email, otp);
+        const result = await verifyOTP(email, otp, {
+          password: signup.password,
+          name: signup.fullName,
+          phone: signup.phone,
+          cnic: signup.cnic,
+          age: signup.age,
+          gender: signup.gender,
+        });
         if (!result.success) {
           const suffix =
             typeof result.remainingAttempts === 'number'
               ? ` (${result.remainingAttempts} attempt${result.remainingAttempts === 1 ? '' : 's'} left)`
               : '';
           setError((result.error ?? 'Incorrect or expired code.') + suffix);
-          return;
-        }
-
-        // 2. Email verified — now create the real MongoDB account.
-        // (Email confirmation is disabled, so this returns a session
-        // immediately and AuthGate routes the patient to their
-        // dashboard.)
-        const { error: suErr } = await MongoDB.auth.signUp({
-          email: signup.email,
-          password: signup.password,
-          options: {
-            data: {
-              full_name: signup.fullName,
-              phone: signup.phone,
-              cnic: signup.cnic,
-              age: signup.age,
-              gender: signup.gender,
-              // Stamp the role at signup based on the email pattern so
-              // metadata stays consistent with what useAuth derives at
-              // login. useAuth still treats email as the source of
-              // truth, so this is belt-and-suspenders.
-              role: roleFromEmail(signup.email) ?? 'PATIENT',
-            },
-          },
-        });
-        if (suErr) {
-          // Detect the already-registered case so the UI can offer
-          // "Sign in instead" rather than a dead-end retry.
-          const code =
-            (suErr as { code?: unknown }).code;
-          const msg = errMessage(suErr, 'Could not create the account.');
-          const isDuplicate =
-            code === 'user_already_exists' ||
-            /already (registered|exists)/i.test(msg);
-          if (isDuplicate) {
-            setAlreadyExists(true);
-            setError('This email is already registered. Please sign in instead.');
-          } else {
-            setError(msg);
-          }
           return;
         }
 
@@ -703,13 +676,8 @@ function SignupOtpView({
       setError(result.error ?? 'Could not resend the code.');
       return;
     }
-    if (result.devOtp) {
-      toast.success(`Dev mode: new code is ${result.devOtp} (auto-filled).`);
-      setCode(result.devOtp);
-    } else {
-      toast.success(`A new code was sent to ${email}.`);
-      setCode('');
-    }
+    toast.success(`A new code was sent to ${email}.`);
+    setCode('');
     setCooldown(60);
   };
 
@@ -854,6 +822,7 @@ function ForgotOtpView({
   onReset: () => void;
   onBack: () => void;
 }) {
+  const { verifyOTP } = useOTP();
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -880,22 +849,11 @@ function ForgotOtpView({
     setError('');
     setSubmitting(true);
     try {
-      const { error: vErr } = await MongoDB.auth.verifyOtp({
-        email,
-        token: code,
-        type: 'recovery',
-      });
-      if (vErr) {
-        setError(errMessage(vErr, 'Incorrect or expired code.'));
+      const result = await verifyOTP(email, code, { password, purpose: 'password-reset' }, false);
+      if (!result.success) {
+        setError(result.error || 'Incorrect or expired code.');
         return;
       }
-      const { error: uErr } = await MongoDB.auth.updateUser({ password });
-      if (uErr) {
-        setError(errMessage(uErr, 'Could not update the password.'));
-        return;
-      }
-      // End the recovery session so the patient signs in fresh.
-      await MongoDB.auth.signOut();
       onReset();
     } catch (err) {
       setError(errMessage(err, 'Password reset failed.'));

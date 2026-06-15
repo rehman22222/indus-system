@@ -317,6 +317,7 @@ NotificationSchema.index({ user_id: 1, read: 1, created_at: -1 });
 const OtpVerificationSchema = new Schema(
     {
         identifier: { type: String, required: true, lowercase: true, trim: true, index: true },
+        purpose: { type: String, enum: ['signup', 'password-reset'], default: 'signup', index: true },
         code_hash: { type: String, required: true, select: false },
         expires_at: { type: Date, required: true },
         verified: { type: Boolean, default: false, index: true },
@@ -327,7 +328,7 @@ const OtpVerificationSchema = new Schema(
     { ...timestamps, collection: 'otp_verifications' },
 );
 OtpVerificationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
-OtpVerificationSchema.index({ identifier: 1, verified: 1, created_at: -1 });
+OtpVerificationSchema.index({ identifier: 1, purpose: 1, verified: 1, created_at: -1 });
 
 const AnalyticsEventSchema = new Schema(
     {

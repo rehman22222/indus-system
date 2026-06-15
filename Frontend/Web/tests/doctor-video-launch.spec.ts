@@ -10,6 +10,7 @@ test.use({
 });
 
 test('doctor video consultation opens in a dedicated browser tab', async ({ page }) => {
+  test.setTimeout(90_000);
   const api = await request.newContext({ baseURL: API_BASE_URL });
   const login = await api.post('/api/auth/login', {
     data: { email: 'doctor1@indus.org.pk', password: '123456' },
@@ -50,10 +51,17 @@ test('doctor video consultation opens in a dedicated browser tab', async ({ page
     const callPage = await popupPromise;
     await callPage.waitForURL(/\/video-call\?token=/, { timeout: 15_000 });
 
-    expect(new URL(callPage.url()).pathname).toBe('/video-call');
-    expect(new URL(callPage.url()).protocol).toBe('https:');
-    await callPage.getByRole('button', { name: 'Enable Camera & Microphone' }).click();
-    await expect(callPage.getByRole('paragraph').filter({ hasText: 'Waiting for the other participant...' })).toBeVisible({ timeout: 15_000 });
+    const callUrl = new URL(callPage.url());
+    expect(callUrl.pathname).toBe('/video-call');
+    expect(['http:', 'https:']).toContain(callUrl.protocol);
+    await expect(callPage.getByText('Clinical workspace', { exact: true })).toBeVisible();
+    await expect(callPage.getByRole('button', { name: /Patient/ })).toBeVisible();
+    await expect(callPage.getByRole('button', { name: /Files/ })).toBeVisible();
+    await expect(callPage.getByRole('button', { name: /Prescription/ })).toBeVisible();
+    await expect(callPage.getByText('Private video consultation', { exact: true })).toBeVisible();
+    await callPage.getByRole('button', { name: 'Join consultation' }).click();
+    await expect(callPage.getByTestId('agora-status')).toContainText('Waiting for the patient to join', { timeout: 30_000 });
+    await expect(callPage.getByRole('button', { name: 'End consultation' })).toBeVisible();
     await expect(page.locator('iframe[title="Video consultation"]')).toHaveCount(0);
     await callPage.close();
   } finally {

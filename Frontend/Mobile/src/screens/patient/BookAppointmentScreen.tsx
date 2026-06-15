@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -19,7 +22,9 @@ import type { Department, Doctor, Slot } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/LanguageContext';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { colors, initials, radius, shadow, spacing } from '@/theme/colors';
+import { navigationAction } from '@/navigation/navigationRef';
+import { initials, radius, shadow, spacing } from '@/theme/colors';
+import { useTheme, type ThemeColors } from '@/theme/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BookAppointment'>;
 
@@ -37,12 +42,26 @@ function fallbackMime(name: string) {
 }
 
 function todayIso() {
-  return new Date().toISOString().split('T')[0];
+  return formatDateIso(new Date());
+}
+
+function formatDateIso(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateIso(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
 }
 
 export function BookAppointmentScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { t, isRtl } = useI18n();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const align = { textAlign: isRtl ? 'right' : 'left' } as const;
   const [departments, setDepartments] = useState<Department[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -51,6 +70,7 @@ export function BookAppointmentScreen({ navigation }: Props) {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [date, setDate] = useState(todayIso());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [complaint, setComplaint] = useState('');
   const [loading, setLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -59,6 +79,13 @@ export function BookAppointmentScreen({ navigation }: Props) {
   const [visitType, setVisitType] = useState<'new' | 'follow_up'>('new');
   const [historySummary, setHistorySummary] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  const handleDateChange = useCallback((event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed' || !selected) return;
+    setDate(formatDateIso(selected));
+    setSlot(null);
+  }, []);
 
   const addAttachment = useCallback(async (kind: DocKind) => {
     try {
@@ -193,7 +220,14 @@ export function BookAppointmentScreen({ navigation }: Props) {
       const body = `${t('book.confirmedBody')} ${appointment?.token || ''}`.trim();
       const note = uploadFailures > 0 ? `\n${t('book.uploadPartial')}` : '';
       Alert.alert(t('book.confirmedTitle'), body + note, [
-        { text: t('common.done'), onPress: () => navigation.goBack() },
+        {
+          text: t('book.viewQr'),
+          onPress: () => navigation.dispatch(navigationAction('AppointmentDetails', { appointmentId: appointment.id })),
+        },
+        {
+          text: t('common.done'),
+          onPress: () => navigation.dispatch(navigationAction('PatientTabs', { screen: 'Appointments' })),
+        },
       ]);
     } catch (error) {
       Alert.alert(t('book.failed'), error instanceof Error ? error.message : t('common.tryAgain'));
@@ -267,13 +301,35 @@ export function BookAppointmentScreen({ navigation }: Props) {
       {doctor && (
         <>
           <Text style={[styles.label, align]}>{t('book.date')}</Text>
-          <TextInput
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.subtle}
-            style={styles.input}
-            value={date}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('book.selectDate')}
+            onPress={() => setShowDatePicker(true)}
+            style={({ pressed }) => [styles.dateInput, pressed && styles.dateInputPressed]}
+          >
+            <Text style={styles.dateText}>{date}</Text>
+            <View style={styles.calendarIcon}>
+              <Ionicons name="calendar-outline" size={20} color={colors.navy} />
+            </View>
+          </Pressable>
+          {showDatePicker && (
+            <View style={Platform.OS === 'ios' ? styles.iosPickerCard : undefined}>
+              <DateTimePicker
+                value={parseDateIso(date)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+                minimumDate={parseDateIso(todayIso())}
+                maximumDate={new Date(new Date().getFullYear() + 1, 11, 31, 12, 0, 0)}
+                onChange={handleDateChange}
+                accentColor={colors.primary}
+              />
+              {Platform.OS === 'ios' && (
+                <Pressable onPress={() => setShowDatePicker(false)} style={styles.dateDoneButton}>
+                  <Text style={styles.dateDoneText}>{t('common.done')}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Visit type — New vs Follow-up */}
           <Text style={[styles.label, align]}>{t('book.visitType')}</Text>
@@ -401,7 +457,8 @@ export function BookAppointmentScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
@@ -474,13 +531,32 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
+  dateInput: {
+    minHeight: 54,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...shadow.soft,
+  },
+  dateInputPressed: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  dateText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  calendarIcon: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navySoft },
+  iosPickerCard: { marginTop: spacing.sm, borderRadius: radius.lg, backgroundColor: colors.surface, overflow: 'hidden', paddingBottom: spacing.sm, ...shadow.soft },
+  dateDoneButton: { alignSelf: 'flex-end', marginRight: spacing.md, borderRadius: radius.sm, backgroundColor: colors.primarySoft, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  dateDoneText: { color: colors.primary, fontWeight: '800' },
   textArea: { minHeight: 96, paddingTop: 12, textAlignVertical: 'top' },
 
   segment: {
     flexDirection: 'row',
     borderRadius: radius.md,
     padding: 4,
-    backgroundColor: '#E9ECF1',
+    backgroundColor: colors.surfaceAlt,
   },
   segmentButton: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: radius.sm },
   segmentButtonActive: { backgroundColor: colors.surface, ...shadow.soft },

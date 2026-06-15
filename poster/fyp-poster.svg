@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="2160" height="3840" viewBox="0 0 2160 3840" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="redGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#BE1E2D"/>
+      <stop offset="1" stop-color="#8E1620"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F6F8"/>
+      <stop offset="1" stop-color="#ECEFF3"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#0B1220" flood-opacity="0.10"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#0B1220" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- ===== background ===== -->
+  <rect width="2160" height="3840" fill="url(#bgGrad)"/>
+
+  <!-- ===== HEADER ===== -->
+  <rect x="0" y="0" width="2160" height="600" fill="url(#redGrad)"/>
+  <!-- subtle accent line -->
+  <rect x="0" y="600" width="2160" height="10" fill="#1B365D"/>
+
+  <!-- logo mark: INDUS H monogram -->
+  <rect x="120" y="120" width="200" height="200" rx="46" fill="#ffffff"/>
+  <rect x="160" y="150" width="26" height="140" rx="4" fill="#8E1620"/>
+  <rect x="254" y="150" width="26" height="140" rx="4" fill="#BE1E2D"/>
+  <rect x="160" y="207" width="120" height="26" fill="#BE1E2D"/>
+
+  <text x="360" y="180" font-size="34" font-weight="700" fill="#FFD9D3" letter-spacing="6">FINAL YEAR PROJECT · 2026</text>
+  <text x="360" y="270" font-size="76" font-weight="800" fill="#ffffff" letter-spacing="-1">Smart Appointment &amp; Consultation</text>
+  <text x="360" y="356" font-size="76" font-weight="800" fill="#ffffff" letter-spacing="-1">System</text>
+  <text x="120" y="470" font-size="40" font-weight="600" fill="#FCE6E2">INDUS Hospital — Doctor Appointment &amp; Online Consultation Module</text>
+
+  <!-- role tags -->
+  <g font-size="30" font-weight="700">
+    <rect x="120" y="512" width="240" height="56" rx="28" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="240" y="550" fill="#ffffff" text-anchor="middle">Patient · Mobile</text>
+    <rect x="376" y="512" width="200" height="56" rx="28" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="476" y="550" fill="#ffffff" text-anchor="middle">Doctor · Web</text>
+    <rect x="592" y="512" width="270" height="56" rx="28" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="727" y="550" fill="#ffffff" text-anchor="middle">Management · Web</text>
+    <rect x="878" y="512" width="170" height="56" rx="28" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="963" y="550" fill="#ffffff" text-anchor="middle">Admin · Web</text>
+    <rect x="1064" y="512" width="270" height="56" rx="28" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="1199" y="550" fill="#ffffff" text-anchor="middle">Reception · Kiosk</text>
+  </g>
+
+  <!-- ===== SECTION: SYSTEM ARCHITECTURE ===== -->
+  <text x="120" y="740" font-size="50" font-weight="800" fill="#0B1220">System Architecture</text>
+  <rect x="120" y="760" width="120" height="8" rx="4" fill="#BE1E2D"/>
+
+  <!-- architecture card -->
+  <rect x="120" y="800" width="1920" height="700" rx="34" fill="#ffffff" filter="url(#cardShadow)"/>
+
+  <!-- clients row -->
+  <g>
+    <!-- mobile -->
+    <rect x="180" y="860" width="560" height="180" rx="24" fill="#FCEEEC" stroke="#F1C9C3" stroke-width="2"/>
+    <rect x="216" y="900" width="78" height="100" rx="14" fill="#BE1E2D"/>
+    <rect x="230" y="916" width="50" height="60" rx="4" fill="#ffffff"/>
+    <text x="330" y="930" font-size="36" font-weight="800" fill="#16202E">Patient Mobile App</text>
+    <text x="330" y="978" font-size="30" fill="#6B7480">React Native · Expo</text>
+    <text x="330" y="1016" font-size="26" fill="#9AA3AF">Book · Queue · Video · Push</text>
+
+    <!-- web -->
+    <rect x="780" y="860" width="600" height="180" rx="24" fill="#E8EDF5" stroke="#C9D6EA" stroke-width="2"/>
+    <rect x="816" y="900" width="120" height="86" rx="12" fill="#1B365D"/>
+    <rect x="828" y="912" width="96" height="50" rx="4" fill="#ffffff"/>
+    <text x="970" y="930" font-size="36" font-weight="800" fill="#16202E">Staff Web Portal</text>
+    <text x="970" y="978" font-size="30" fill="#6B7480">React + Vite + TypeScript</text>
+    <text x="970" y="1016" font-size="26" fill="#9AA3AF">Doctor · Admin · Mgmt · Kiosk</text>
+
+    <!-- arrows down -->
+    <text x="1700" y="940" font-size="30" font-weight="700" fill="#1B365D">HTTPS REST</text>
+    <text x="1700" y="980" font-size="30" font-weight="700" fill="#1B365D">+ Socket.IO</text>
+    <path d="M1640 900 h200 v40" fill="none" stroke="#1B365D" stroke-width="3" stroke-dasharray="6 6"/>
+  </g>
+
+  <!-- backend bar -->
+  <rect x="180" y="1090" width="1800" height="130" rx="22" fill="url(#redGrad)"/>
+  <text x="230" y="1150" font-size="40" font-weight="800" fill="#ffffff">Backend API — Node.js + Express</text>
+  <text x="230" y="1196" font-size="28" fill="#FCE6E2">JWT &amp; OTP Auth · Role-based Access · Socket.IO Realtime · Notification Queue</text>
+  <text x="1930" y="1175" font-size="34" font-weight="800" fill="#ffffff" text-anchor="end">:5000</text>
+
+  <!-- connectors -->
+  <path d="M1080 1220 v40" stroke="#C7CCD4" stroke-width="3"/>
+
+  <!-- services row -->
+  <g font-weight="700">
+    <!-- mongodb -->
+    <rect x="180" y="1290" width="350" height="170" rx="20" fill="#F8FAFC" stroke="#E7E9EE" stroke-width="2"/>
+    <ellipse cx="240" cy="1345" rx="34" ry="14" fill="#15814A"/>
+    <path d="M206 1345 v40 a34 14 0 0 0 68 0 v-40" fill="#15814A"/>
+    <text x="300" y="1352" font-size="32" font-weight="800" fill="#16202E">MongoDB Atlas</text>
+    <text x="300" y="1392" font-size="26" font-weight="600" fill="#6B7480">Database · Mongoose</text>
+    <text x="300" y="1428" font-size="24" fill="#9AA3AF">14 collections · indexed</text>
+
+    <!-- analytics -->
+    <rect x="550" y="1290" width="350" height="170" rx="20" fill="#F8FAFC" stroke="#E7E9EE" stroke-width="2"/>
+    <circle cx="612" cy="1352" r="30" fill="#1B365D"/>
+    <path d="M598 1352 h28 M612 1338 v28" stroke="#ffffff" stroke-width="4"/>
+    <text x="672" y="1346" font-size="32" font-weight="800" fill="#16202E">Analytics ML</text>
+    <text x="672" y="1386" font-size="26" font-weight="600" fill="#6B7480">Python · FastAPI</text>
+    <text x="672" y="1422" font-size="24" fill="#9AA3AF">XGBoost · Prophet · SHAP</text>
+
+    <!-- jitsi -->
+    <rect x="920" y="1290" width="350" height="170" rx="20" fill="#F8FAFC" stroke="#E7E9EE" stroke-width="2"/>
+    <rect x="980" y="1325" width="64" height="48" rx="10" fill="#1B365D"/>
+    <path d="M1044 1338 l24 -12 v36 l-24 -12 z" fill="#1B365D"/>
+    <text x="1090" y="1346" font-size="32" font-weight="800" fill="#16202E">Jitsi Meet</text>
+    <text x="1090" y="1386" font-size="26" font-weight="600" fill="#6B7480">Video Consultation</text>
+    <text x="1090" y="1422" font-size="24" fill="#9AA3AF">Free · no API key</text>
+
+    <!-- fcm -->
+    <rect x="1290" y="1290" width="320" height="170" rx="20" fill="#F8FAFC" stroke="#E7E9EE" stroke-width="2"/>
+    <path d="M1350 1320 c-26 0 -40 18 -40 44 0 18 -10 22 -16 30 h112 c-6 -8 -16 -12 -16 -30 0 -26 -14 -44 -40 -44 z" fill="#B45309"/>
+    <circle cx="1350" cy="1392" r="9" fill="#B45309"/>
+    <text x="1404" y="1346" font-size="32" font-weight="800" fill="#16202E">Firebase</text>
+    <text x="1404" y="1386" font-size="26" font-weight="600" fill="#6B7480">Push (FCM)</text>
+    <text x="1404" y="1422" font-size="24" fill="#9AA3AF">Reminders · alerts</text>
+
+    <!-- resend + redis -->
+    <rect x="1630" y="1290" width="350" height="170" rx="20" fill="#F8FAFC" stroke="#E7E9EE" stroke-width="2"/>
+    <rect x="1672" y="1325" width="60" height="44" rx="8" fill="#BE1E2D"/>
+    <path d="M1672 1329 l30 22 l30 -22" fill="none" stroke="#ffffff" stroke-width="4"/>
+    <text x="1752" y="1346" font-size="32" font-weight="800" fill="#16202E">Resend</text>
+    <text x="1752" y="1386" font-size="26" font-weight="600" fill="#6B7480">Email · OTP</text>
+    <text x="1752" y="1422" font-size="24" fill="#9AA3AF">+ Redis cache (scale)</text>
+  </g>
+
+  <!-- ===== SECTION: HOW IT WORKS (FLOW) ===== -->
+  <text x="120" y="1640" font-size="50" font-weight="800" fill="#0B1220">How It Works — Patient Journey</text>
+  <rect x="120" y="1660" width="120" height="8" rx="4" fill="#BE1E2D"/>
+
+  <rect x="120" y="1700" width="1920" height="430" rx="34" fill="#ffffff" filter="url(#cardShadow)"/>
+
+  <!-- 6 steps -->
+  <g>
+    <!-- step template positions -->
+    <!-- 1 Book -->
+    <circle cx="280" cy="1820" r="46" fill="#BE1E2D"/>
+    <text x="280" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">1</text>
+    <text x="280" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Book</text>
+    <text x="280" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">Physical / video</text>
+    <text x="280" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">→ unique token</text>
+
+    <!-- 2 Check-in -->
+    <circle cx="585" cy="1820" r="46" fill="#BE1E2D"/>
+    <text x="585" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">2</text>
+    <text x="585" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Check-in</text>
+    <text x="585" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">QR / kiosk</text>
+    <text x="585" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">→ joins queue</text>
+
+    <!-- 3 Queue -->
+    <circle cx="890" cy="1820" r="46" fill="#BE1E2D"/>
+    <text x="890" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">3</text>
+    <text x="890" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Live Queue</text>
+    <text x="890" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">Realtime updates</text>
+    <text x="890" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">via Socket.IO</text>
+
+    <!-- 4 Consult -->
+    <circle cx="1195" cy="1820" r="46" fill="#BE1E2D"/>
+    <text x="1195" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">4</text>
+    <text x="1195" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Consult</text>
+    <text x="1195" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">In-person or</text>
+    <text x="1195" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">Jitsi video</text>
+
+    <!-- 5 Prescribe -->
+    <circle cx="1500" cy="1820" r="46" fill="#BE1E2D"/>
+    <text x="1500" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="1500" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Prescribe</text>
+    <text x="1500" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">E-prescription</text>
+    <text x="1500" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">+ records</text>
+
+    <!-- 6 Predict -->
+    <circle cx="1805" cy="1820" r="46" fill="#1B365D"/>
+    <text x="1805" y="1836" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle">6</text>
+    <text x="1805" y="1920" font-size="34" font-weight="800" fill="#16202E" text-anchor="middle">Predict</text>
+    <text x="1805" y="1962" font-size="25" fill="#6B7480" text-anchor="middle">ML no-show risk</text>
+    <text x="1805" y="1994" font-size="25" fill="#6B7480" text-anchor="middle">→ admin alert</text>
+
+    <!-- connecting arrows -->
+    <g stroke="#E2A39B" stroke-width="4" fill="none">
+      <path d="M334 1820 h197" marker-end="url(#ar)"/>
+      <path d="M639 1820 h197"/>
+      <path d="M944 1820 h197"/>
+      <path d="M1249 1820 h197"/>
+      <path d="M1554 1820 h197"/>
+    </g>
+  </g>
+
+  <!-- ===== SECTION: KEY FEATURES ===== -->
+  <text x="120" y="2270" font-size="50" font-weight="800" fill="#0B1220">Key Features</text>
+  <rect x="120" y="2290" width="120" height="8" rx="4" fill="#BE1E2D"/>
+
+  <!-- feature cards grid 3 x 2 -->
+  <g>
+    <!-- row 1 -->
+    <rect x="120" y="2330" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="160" y="2370" width="86" height="86" rx="20" fill="#FCEEEC"/>
+    <rect x="184" y="2398" width="38" height="34" rx="5" fill="none" stroke="#BE1E2D" stroke-width="5"/>
+    <path d="M184 2408 h38 M194 2390 v12 M212 2390 v12" stroke="#BE1E2D" stroke-width="5"/>
+    <text x="280" y="2412" font-size="36" font-weight="800" fill="#16202E">Appointment Booking</text>
+    <text x="280" y="2456" font-size="27" fill="#6B7480">Physical or video, token &amp;</text>
+    <text x="280" y="2492" font-size="27" fill="#6B7480">slot selection per doctor.</text>
+
+    <rect x="780" y="2330" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="820" y="2370" width="86" height="86" rx="20" fill="#E8EDF5"/>
+    <circle cx="848" cy="2405" r="9" fill="#1B365D"/><circle cx="878" cy="2405" r="9" fill="#1B365D"/><circle cx="863" cy="2432" r="9" fill="#1B365D"/>
+    <text x="940" y="2412" font-size="36" font-weight="800" fill="#16202E">Real-time Queue</text>
+    <text x="940" y="2456" font-size="27" fill="#6B7480">Live patient flow &amp; status</text>
+    <text x="940" y="2492" font-size="27" fill="#6B7480">across all dashboards.</text>
+
+    <rect x="1440" y="2330" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="1480" y="2370" width="86" height="86" rx="20" fill="#E8EDF5"/>
+    <rect x="1502" y="2392" width="52" height="40" rx="8" fill="#1B365D"/>
+    <path d="M1554 2400 l16 -8 v28 l-16 -8 z" fill="#1B365D"/>
+    <text x="1600" y="2412" font-size="36" font-weight="800" fill="#16202E">Video Consultation</text>
+    <text x="1600" y="2456" font-size="27" fill="#6B7480">Jitsi Meet — doctor (web)</text>
+    <text x="1600" y="2492" font-size="27" fill="#6B7480">&amp; patient (mobile) join.</text>
+
+    <!-- row 2 -->
+    <rect x="120" y="2590" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="160" y="2630" width="86" height="86" rx="20" fill="#FCEEEC"/>
+    <rect x="186" y="2652" width="34" height="44" rx="5" fill="none" stroke="#BE1E2D" stroke-width="5"/>
+    <path d="M194 2666 h18 M194 2680 h18" stroke="#BE1E2D" stroke-width="4"/>
+    <text x="280" y="2672" font-size="36" font-weight="800" fill="#16202E">E-Prescriptions</text>
+    <text x="280" y="2716" font-size="27" fill="#6B7480">Medications, dosage &amp;</text>
+    <text x="280" y="2752" font-size="27" fill="#6B7480">follow-up, stored per visit.</text>
+
+    <rect x="780" y="2590" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="820" y="2630" width="86" height="86" rx="20" fill="#FBEEDC"/>
+    <path d="M863 2648 c-20 0 -30 14 -30 34 0 14 -8 17 -12 23 h84 c-4 -6 -12 -9 -12 -23 0 -20 -10 -34 -30 -34 z" fill="#B45309"/>
+    <text x="940" y="2672" font-size="36" font-weight="800" fill="#16202E">Push Notifications</text>
+    <text x="940" y="2716" font-size="27" fill="#6B7480">FCM reminders, queue calls</text>
+    <text x="940" y="2752" font-size="27" fill="#6B7480">&amp; confirmations + OTP email.</text>
+
+    <rect x="1440" y="2590" width="600" height="230" rx="28" fill="#ffffff" filter="url(#softShadow)"/>
+    <rect x="1480" y="2630" width="86" height="86" rx="20" fill="#E8EDF5"/>
+    <rect x="1496" y="2668" width="14" height="30" fill="#1B365D"/><rect x="1516" y="2654" width="14" height="44" fill="#1B365D"/><rect x="1536" y="2642" width="14" height="56" fill="#1B365D"/>
+    <text x="1600" y="2672" font-size="36" font-weight="800" fill="#16202E">AI No-Show Risk</text>
+    <text x="1600" y="2716" font-size="27" fill="#6B7480">XGBoost scoring + SHAP</text>
+    <text x="1600" y="2752" font-size="27" fill="#6B7480">explainability for admins.</text>
+  </g>
+
+  <!-- ===== SECTION: TECH STACK ===== -->
+  <text x="120" y="2940" font-size="50" font-weight="800" fill="#0B1220">Technology Stack</text>
+  <rect x="120" y="2960" width="120" height="8" rx="4" fill="#BE1E2D"/>
+
+  <rect x="120" y="3000" width="1920" height="360" rx="34" fill="#ffffff" filter="url(#cardShadow)"/>
+  <g font-size="29" font-weight="700">
+    <!-- rows of labelled groups -->
+    <text x="170" y="3070" font-size="30" font-weight="800" fill="#BE1E2D">Frontend</text>
+    <g fill="#16202E">
+      <rect x="170" y="3090" width="170" height="56" rx="28" fill="#F2F4F7"/><text x="255" y="3127" text-anchor="middle">React</text>
+      <rect x="356" y="3090" width="150" height="56" rx="28" fill="#F2F4F7"/><text x="431" y="3127" text-anchor="middle">Vite</text>
+      <rect x="522" y="3090" width="250" height="56" rx="28" fill="#F2F4F7"/><text x="647" y="3127" text-anchor="middle">React Native</text>
+      <rect x="788" y="3090" width="150" height="56" rx="28" fill="#F2F4F7"/><text x="863" y="3127" text-anchor="middle">Expo</text>
+      <rect x="954" y="3090" width="210" height="56" rx="28" fill="#F2F4F7"/><text x="1059" y="3127" text-anchor="middle">TypeScript</text>
+      <rect x="1180" y="3090" width="190" height="56" rx="28" fill="#F2F4F7"/><text x="1275" y="3127" text-anchor="middle">Tailwind</text>
+    </g>
+
+    <text x="170" y="3210" font-size="30" font-weight="800" fill="#BE1E2D">Backend &amp; Data</text>
+    <g fill="#16202E">
+      <rect x="170" y="3230" width="190" height="56" rx="28" fill="#F2F4F7"/><text x="265" y="3267" text-anchor="middle">Node.js</text>
+      <rect x="376" y="3230" width="180" height="56" rx="28" fill="#F2F4F7"/><text x="466" y="3267" text-anchor="middle">Express</text>
+      <rect x="572" y="3230" width="200" height="56" rx="28" fill="#F2F4F7"/><text x="672" y="3267" text-anchor="middle">Socket.IO</text>
+      <rect x="788" y="3230" width="260" height="56" rx="28" fill="#F2F4F7"/><text x="918" y="3267" text-anchor="middle">MongoDB Atlas</text>
+      <rect x="1064" y="3230" width="200" height="56" rx="28" fill="#F2F4F7"/><text x="1164" y="3267" text-anchor="middle">Mongoose</text>
+      <rect x="1280" y="3230" width="150" height="56" rx="28" fill="#F2F4F7"/><text x="1355" y="3267" text-anchor="middle">Redis</text>
+      <rect x="1446" y="3230" width="130" height="56" rx="28" fill="#F2F4F7"/><text x="1511" y="3267" text-anchor="middle">JWT</text>
+    </g>
+
+    <text x="170" y="3328" font-size="30" font-weight="800" fill="#BE1E2D">AI / Analytics &amp; Services</text>
+    <g fill="#16202E">
+      <rect x="660" y="3290" width="150" height="50" rx="25" fill="#E8EDF5"/><text x="735" y="3324" text-anchor="middle">Python</text>
+      <rect x="826" y="3290" width="170" height="50" rx="25" fill="#E8EDF5"/><text x="911" y="3324" text-anchor="middle">FastAPI</text>
+      <rect x="1012" y="3290" width="170" height="50" rx="25" fill="#E8EDF5"/><text x="1097" y="3324" text-anchor="middle">XGBoost</text>
+      <rect x="1198" y="3290" width="160" height="50" rx="25" fill="#E8EDF5"/><text x="1278" y="3324" text-anchor="middle">Prophet</text>
+      <rect x="1374" y="3290" width="140" height="50" rx="25" fill="#E8EDF5"/><text x="1444" y="3324" text-anchor="middle">SHAP</text>
+      <rect x="1530" y="3290" width="180" height="50" rx="25" fill="#E8EDF5"/><text x="1620" y="3324" text-anchor="middle">Jitsi · FCM</text>
+      <rect x="1726" y="3290" width="160" height="50" rx="25" fill="#FCEEEC"/><text x="1806" y="3324" text-anchor="middle">Resend</text>
+    </g>
+  </g>
+
+  <!-- scalability strip -->
+  <rect x="120" y="3400" width="1920" height="120" rx="24" fill="#0B1220"/>
+  <text x="170" y="3455" font-size="34" font-weight="800" fill="#ffffff">Production-ready &amp; Scalable</text>
+  <text x="170" y="3498" font-size="27" fill="#A8B0BD">Cluster mode (multi-core) · Redis cache &amp; Socket.IO adapter · ~1000+ concurrent users · OTP/JWT security</text>
+  <text x="1990" y="3478" font-size="46" font-weight="800" fill="#1B365D" text-anchor="end">1000+ users</text>
+
+  <!-- ===== FOOTER ===== -->
+  <rect x="0" y="3560" width="2160" height="280" fill="#ffffff"/>
+  <rect x="0" y="3560" width="2160" height="6" fill="#BE1E2D"/>
+  <text x="120" y="3640" font-size="34" font-weight="800" fill="#0B1220">Submitted by:  [ Student Name ] · [ Reg. No ]    |    Partner:  [ Student Name ] · [ Reg. No ]</text>
+  <text x="120" y="3695" font-size="32" font-weight="600" fill="#16202E">Supervisor:  [ Supervisor Name ]</text>
+  <text x="120" y="3748" font-size="32" font-weight="600" fill="#6B7480">[ Department ] · [ University ] · 2026</text>
+  <text x="2040" y="3700" font-size="30" font-weight="700" fill="#BE1E2D" text-anchor="end">INDUS Hospital</text>
+  <text x="2040" y="3744" font-size="26" fill="#9AA3AF" text-anchor="end">Smart Healthcare · FYP 2026</text>
+</svg>

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { login as loginRequest } from '@/api/auth';
+import { login as loginRequest, verifyPatientPasswordReset, verifyPatientSignup } from '@/api/auth';
 import { setAccessToken } from '@/api/client';
 import type { AuthSession, User } from '@/api/types';
 import { clearSession, readSession, saveSession } from '@/auth/storage';
@@ -12,13 +12,15 @@ type AuthContextValue = {
   token: string | null;
   isBooting: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  completePatientSignup: (input: { email: string; code: string; password: string; name: string; phone?: string; cnic?: string; age?: number; gender?: string }) => Promise<void>;
+  completePasswordReset: (input: { email: string; code: string; password: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function isPatientRole(role?: string) {
-  return String(role || '').trim().toLowerCase() === 'patient';
+function isMobileRole(role?: string) {
+  return ['patient', 'doctor'].includes(String(role || '').trim().toLowerCase());
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -31,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((raw) => {
         if (!mounted || !raw) return;
         const stored = JSON.parse(raw) as AuthSession;
-        if (!isPatientRole(stored.user?.role)) {
+        if (!isMobileRole(stored.user?.role)) {
           clearSession().catch(() => undefined);
           setAccessToken(null);
           return;
@@ -53,10 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const nextSession = await loginRequest(email, password);
-    if (!isPatientRole(nextSession.user?.role)) {
+    if (!isMobileRole(nextSession.user?.role)) {
       setAccessToken(null);
       await clearSession();
-      throw new Error('This mobile app is for patients only. Doctor, admin, and management users should use the web portal.');
+      throw new Error('Only patient and doctor accounts can use the mobile app.');
     }
     setAccessToken(nextSession.token);
     setSession(nextSession);
@@ -64,6 +66,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     registerForPushNotifications().catch((error) => {
       console.log('Push registration skipped:', error?.message || 'unavailable in Expo Go');
     });
+  }, []);
+
+  const completePatientSignup = useCallback(async (input: { email: string; code: string; password: string; name: string; phone?: string; cnic?: string; age?: number; gender?: string }) => {
+    const nextSession = await verifyPatientSignup(input);
+    if (nextSession.user.role !== 'patient') throw new Error('Only patients can register from the mobile app.');
+    setAccessToken(nextSession.token);
+    setSession(nextSession);
+    await saveSession(JSON.stringify(nextSession));
+    registerForPushNotifications().catch(() => undefined);
+  }, []);
+
+  const completePasswordReset = useCallback(async (input: { email: string; code: string; password: string }) => {
+    const nextSession = await verifyPatientPasswordReset(input);
+    if (nextSession.user.role !== 'patient') throw new Error('Only patient passwords can be reset from the mobile app.');
+    setAccessToken(nextSession.token);
+    setSession(nextSession);
+    await saveSession(JSON.stringify(nextSession));
+    registerForPushNotifications().catch(() => undefined);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -79,9 +99,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: session?.token || null,
       isBooting,
       signIn,
+      completePatientSignup,
+      completePasswordReset,
       signOut,
     }),
-    [isBooting, session, signIn, signOut],
+    [completePasswordReset, completePatientSignup, isBooting, session, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

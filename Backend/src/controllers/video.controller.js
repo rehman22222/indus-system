@@ -13,6 +13,7 @@ import { requireObjectId, serialize, serializeMany } from '../utils/mongo.js';
 import { env } from '../config/env.js';
 import { emitToUser } from '../services/realtime.service.js';
 import { invalidateCache } from '../services/cache.service.js';
+import { agoraChannelFor, generateRtcToken, isAgoraConfigured, uidForRole } from '../services/agora.service.js';
 
 const DAILY_API_URL = process.env.DAILY_API_URL || 'https://api.daily.co/v1';
 
@@ -82,6 +83,10 @@ function webRtcCallUrl({ appointmentId, userId, role, baseUrl = env.CALL_WEB_BAS
     return url.toString();
 }
 
+function callBaseUrlFor(role) {
+    return role === 'doctor' ? env.DOCTOR_CALL_WEB_BASE_URL : env.PATIENT_CALL_WEB_BASE_URL;
+}
+
 async function webRtcRoom(appointment, appointmentId, userId, role, baseUrl) {
     const name = `appointment-${appointmentId}`;
     if (
@@ -142,16 +147,48 @@ const isDailyRoomUrl = (url) => {
     }
 };
 
-async function jitsiRoom(appointment, appointmentId) {
+async function agoraRoom(appointment, appointmentId, userId, role, baseUrl) {
+    if (!isAgoraConfigured()) throw new AppError('Agora App ID / App Certificate are not configured', 500);
+    const channel = agoraChannelFor(appointmentId);
+    if (appointment.video_room_name !== channel || appointment.appointment_type !== 'video' || appointment.video_room_url) {
+        appointment.video_room_name = channel;
+        appointment.video_room_url = undefined; // Agora is token+channel based, not URL based
+        appointment.appointment_type = 'video';
+        await appointment.save();
+    }
+    const cred = generateRtcToken({ channel, uid: uidForRole(role) });
+    return {
+        provider: 'agora',
+        name: channel,
+        channel,
+        appId: cred.appId,
+        token: cred.token,
+        uid: cred.uid,
+        expiresAt: cred.expiresAt,
+        // The signed page lets the rung patient (mobile browser) fetch its own token.
+        url: webRtcCallUrl({ appointmentId, userId, role, baseUrl }),
+        message: 'Agora call ready',
+    };
+}
+
+async function jitsiRoom(appointment, appointmentId, userId, role, baseUrl) {
     const name = `indus-appointment-${appointmentId}`;
-    const url = `${env.JITSI_BASE_URL.replace(/\/+$/, '')}/${name}`;
-    if (appointment.video_room_url !== url || appointment.video_room_name !== name) {
-        appointment.video_room_url = url;
+    const meetingUrl = `${env.JITSI_BASE_URL.replace(/\/+$/, '')}/${name}#config.prejoinPageEnabled=false&config.disableDeepLinking=true`;
+    if (appointment.video_room_url !== meetingUrl || appointment.video_room_name !== name) {
+        appointment.video_room_url = meetingUrl;
         appointment.video_room_name = name;
         appointment.appointment_type = 'video';
         await appointment.save();
     }
-    return { url, name, provider: 'jitsi', message: 'Jitsi room ready' };
+    return {
+        url: role === 'doctor'
+            ? webRtcCallUrl({ appointmentId, userId, role, baseUrl })
+            : meetingUrl,
+        meetingUrl,
+        name,
+        provider: 'jitsi',
+        message: 'Jitsi room ready',
+    };
 }
 
 async function dailyRoom(appointment, appointmentId) {
@@ -216,20 +253,27 @@ export const createVideoRoom = async (req, res) => {
     if (!allowed) throw new AppError('Unauthorized to join this consultation', 403);
 
     const provider = String(req.body.provider || env.VIDEO_PROVIDER || 'webrtc').toLowerCase();
+    const callerBaseUrl = callBaseUrlFor(req.userRole);
     const room = provider === 'daily'
         ? await dailyRoom(appointment, appointmentId)
         : provider === 'jitsi'
-            ? await jitsiRoom(appointment, appointmentId)
-            : await webRtcRoom(appointment, appointmentId, req.user.id, req.userRole, env.CALL_WEB_BASE_URL);
+            ? await jitsiRoom(appointment, appointmentId, req.user.id, req.userRole, callerBaseUrl)
+            : provider === 'agora'
+                ? await agoraRoom(appointment, appointmentId, req.user.id, req.userRole, callerBaseUrl)
+                : await webRtcRoom(appointment, appointmentId, req.user.id, req.userRole, callerBaseUrl);
 
-    // Doctor initiated → ring the patient.
+    // Doctor initiated → ring the patient. webrtc + agora send the patient to the
+    // signed /video-call page (it fetches its own per-role token there).
     if (req.userRole === 'doctor') {
-        const patientRoomUrl = room.provider === 'webrtc'
+        const patientRoomUrl = room.provider === 'webrtc' || room.provider === 'agora'
             ? webRtcCallUrl({
                 appointmentId,
                 userId: appointment.patient_id,
                 role: 'patient',
+                baseUrl: env.PATIENT_CALL_WEB_BASE_URL,
             })
+            : room.provider === 'jitsi'
+                ? room.meetingUrl
             : room.url;
         emitToUser(appointment.patient_id.toString(), 'call:incoming', {
             appointmentId: appointmentId.toString(),
@@ -244,8 +288,41 @@ export const createVideoRoom = async (req, res) => {
     res.status(200).json({
         message: room.message,
         provider: room.provider,
-        room: { url: room.url, name: room.name, provider: room.provider },
+        // Agora callers also receive their channel/token/appId to join immediately.
+        room: {
+            url: room.url,
+            name: room.name,
+            provider: room.provider,
+            ...(room.provider === 'agora'
+                ? { channel: room.channel, appId: room.appId, token: room.token, uid: room.uid, expiresAt: room.expiresAt }
+                : {}),
+        },
     });
+};
+
+/**
+ * GET /api/v1/video/agora-token?token=<call-jwt>
+ * The signed /video-call page (patient mobile browser / doctor) fetches a fresh
+ * per-role Agora token here.
+ */
+export const getAgoraToken = async (req, res) => {
+    const { appointment, payload } = await resolveCallSession(req);
+    const channel = agoraChannelFor(appointment._id);
+    const cred = generateRtcToken({ channel, uid: uidForRole(payload.role) });
+    res.status(200).json({ provider: 'agora', role: payload.role, ...cred });
+};
+
+/**
+ * GET /api/v1/video/agora-test-token?channel=indus-test&uid=0
+ * Dev-only helper so a standalone test page can confirm Agora connectivity
+ * without a real appointment. Disabled in production.
+ */
+export const getAgoraTestToken = async (req, res) => {
+    if (env.IS_PRODUCTION) throw new AppError('Not available in production', 404);
+    const channel = String(req.query.channel || 'indus-test').slice(0, 64);
+    const uid = Number(req.query.uid) || 0;
+    const cred = generateRtcToken({ channel, uid });
+    res.status(200).json({ provider: 'agora', ...cred });
 };
 
 /**

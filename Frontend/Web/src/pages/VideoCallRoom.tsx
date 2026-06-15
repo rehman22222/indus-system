@@ -1,25 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import Peer, { type SignalData } from 'simple-peer';
 import {
   Camera,
-  CameraOff,
   ClipboardPenLine,
   ExternalLink,
   FileText,
   Files,
   Loader2,
-  Mic,
-  MicOff,
   PanelRightClose,
   PanelRightOpen,
-  PhoneOff,
   Plus,
   Save,
   ShieldCheck,
   Trash2,
   UserRound,
 } from 'lucide-react';
+import { AgoraCall } from '@/components/shared/AgoraCall';
 
 const CONFIGURED_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -48,6 +44,12 @@ const API_BASE_URL = (() => {
 
 type CallToken = { appointmentId: string; role: string };
 type Medication = { name: string; dosage: string; frequency: string; duration: string };
+type AgoraCredentials = {
+  appId: string;
+  channel: string;
+  token?: string | null;
+  uid?: number;
+};
 type ClinicalContext = {
   role: string;
   appointment: {
@@ -57,6 +59,7 @@ type ClinicalContext = {
     date?: string;
     time?: string;
     appointment_type?: string;
+    video_room_url?: string;
     visit_type?: string;
     chief_complaint?: string;
     history_summary?: string;
@@ -101,44 +104,6 @@ function decodeCallToken(token: string): CallToken | null {
   }
 }
 
-function iceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-  ];
-  const turnUrl = import.meta.env.VITE_TURN_URL;
-  if (turnUrl) {
-    servers.push({
-      urls: turnUrl.split(',').map((url: string) => url.trim()).filter(Boolean),
-      username: import.meta.env.VITE_TURN_USERNAME || undefined,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL || undefined,
-    });
-  }
-  return servers;
-}
-
-function requestMediaWithTimeout(
-  constraints: MediaStreamConstraints,
-  timeoutMs: number,
-  label: string,
-): Promise<MediaStream> {
-  let timedOut = false;
-  let timeoutId = 0;
-  const mediaRequest = navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-    if (timedOut) {
-      stream.getTracks().forEach((track) => track.stop());
-      throw new Error(`${label} started too late. Please try again.`);
-    }
-    return stream;
-  });
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => {
-      timedOut = true;
-      reject(new Error(`${label} did not respond. Close other camera apps or browser tabs, then try again.`));
-    }, timeoutMs);
-  });
-  return Promise.race([mediaRequest, timeout]).finally(() => window.clearTimeout(timeoutId));
-}
-
 function formatMedicalHistory(value: unknown) {
   if (!value) return 'None provided';
   if (typeof value === 'string') return value || 'None provided';
@@ -171,11 +136,6 @@ export default function VideoCallRoom() {
     }
   }, [searchParams]);
   const call = useMemo(() => decodeCallToken(token), [token]);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const peerRef = useRef<Peer.Instance | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const startMediaRef = useRef<(() => void) | null>(null);
   const mediaRequestRef = useRef(false);
@@ -184,13 +144,9 @@ export default function VideoCallRoom() {
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
-  const [audioUnavailable, setAudioUnavailable] = useState(false);
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [cameraOff, setCameraOff] = useState(false);
   const [connected, setConnected] = useState(false);
-  const [remoteVideoReady, setRemoteVideoReady] = useState(false);
-  const [remotePlaybackBlocked, setRemotePlaybackBlocked] = useState(false);
+  const [agoraCredentials, setAgoraCredentials] = useState<AgoraCredentials | null>(null);
   const [ended, setEnded] = useState(false);
   const [clinical, setClinical] = useState<ClinicalContext | null>(null);
   const [clinicalError, setClinicalError] = useState('');
@@ -206,6 +162,7 @@ export default function VideoCallRoom() {
   const [savingPrescription, setSavingPrescription] = useState(false);
   const [prescriptionMessage, setPrescriptionMessage] = useState('');
   const isDoctor = call?.role === 'doctor';
+  const displayName = clinical?.appointment?.doctor_id?.name || 'Doctor';
 
   const returnToPatientApp = useCallback(() => {
     if (returnUrl) window.location.assign(returnUrl);
@@ -239,30 +196,12 @@ export default function VideoCallRoom() {
   const finishCall = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
-    peerRef.current?.destroy();
-    peerRef.current = null;
     socketRef.current?.disconnect();
     socketRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    remoteStreamRef.current = null;
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    setAgoraCredentials(null);
+    setMediaReady(false);
     setConnected(false);
-    setRemoteVideoReady(false);
     setEnded(true);
-  }, []);
-
-  const playRemoteVideo = useCallback(async () => {
-    const video = remoteVideoRef.current;
-    if (!video || !video.srcObject) return;
-    try {
-      await video.play();
-      setRemotePlaybackBlocked(false);
-      setRemoteVideoReady(true);
-    } catch {
-      setRemotePlaybackBlocked(true);
-    }
   }, []);
 
   useEffect(() => {
@@ -283,128 +222,39 @@ export default function VideoCallRoom() {
 
     let disposed = false;
     let socket: Socket | null = null;
-
-    const attachRemoteStream = (remoteStream: MediaStream) => {
-      remoteStreamRef.current = remoteStream;
-      const video = remoteVideoRef.current;
-      if (!video) return;
-      if (video.srcObject !== remoteStream) video.srcObject = remoteStream;
-      const videoTrack = remoteStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.onunmute = () => { void playRemoteVideo(); };
-        videoTrack.onended = () => setRemoteVideoReady(false);
-      }
-      void playRemoteVideo();
-    };
-
-    const createPeer = (initiator: boolean) => {
-      if (peerRef.current || !streamRef.current || !socket) return peerRef.current;
-      const peer = new Peer({
-        initiator,
-        trickle: true,
-        stream: streamRef.current,
-        config: { iceServers: iceServers() },
-      });
-      peerRef.current = peer;
-      peer.on('signal', (signal: SignalData) => {
-        socket?.emit('video.signal', { appointmentId: call.appointmentId, signal });
-      });
-      peer.on('connect', () => {
-        setConnected(true);
-        setStatus('Connected');
-      });
-      peer.on('stream', attachRemoteStream);
-      peer.on('track', (_track: MediaStreamTrack, remoteStream: MediaStream) => {
-        attachRemoteStream(remoteStream);
-      });
-      peer.on('close', () => {
-        peerRef.current = null;
-        if (endedRef.current) return;
-        setConnected(false);
-        setRemoteVideoReady(false);
-        setStatus('The other participant left. Waiting for them to rejoin...');
-      });
-      peer.on('error', (peerError: Error) => {
-        console.error('Video peer error:', peerError);
-        if (!endedRef.current) setError('The video connection was interrupted. Please leave and join again.');
-      });
-      return peer;
-    };
-
     const start = async () => {
-      if (mediaRequestRef.current || streamRef.current) return;
+      if (mediaRequestRef.current || agoraCredentials) return;
       mediaRequestRef.current = true;
       setStarting(true);
       setError('');
       setShowPermissionHelp(false);
-      setStatus('Waiting for browser permission...');
+      setStatus('Preparing private video consultation...');
       const helpTimer = window.setTimeout(() => setShowPermissionHelp(true), 8000);
 
       try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires an HTTPS deployment.');
-        const videoStream = await requestMediaWithTimeout({ video: true, audio: false }, 12000, 'Camera');
-        if (disposed) {
-          videoStream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        const stream = new MediaStream(videoStream.getVideoTracks());
-        streamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          await localVideoRef.current.play().catch(() => undefined);
-        }
-        setMediaReady(true);
-        setStarting(false);
-        setShowPermissionHelp(false);
-        setStatus('Waiting for the other participant...');
+        const response = await fetch(`${API_BASE_URL}/api/v1/video/agora-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.message || body.error || 'Could not prepare the Agora call.');
+        if (disposed) return;
+        setAgoraCredentials(body as AgoraCredentials);
 
         socket = io(API_BASE_URL, { auth: { token }, transports: ['websocket', 'polling'] });
         socketRef.current = socket;
         socket.on('connect', () => socket?.emit('video.join', { appointmentId: call.appointmentId }));
-        socket.on('video.peer-joined', () => {
-          setStatus('Connecting securely...');
-          if (call.role === 'doctor') createPeer(true);
-        });
-        socket.on('video.signal', ({ signal }: { signal: SignalData }) => {
-          const peer = peerRef.current || createPeer(false);
-          if (peer && !peer.destroyed) peer.signal(signal);
-        });
         socket.on('video.peer-left', () => {
-          peerRef.current?.destroy();
-          peerRef.current = null;
-          remoteStreamRef.current = null;
-          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-          setConnected(false);
-          setRemoteVideoReady(false);
           setStatus('The other participant left. Waiting for them to rejoin...');
         });
         socket.on('video.ended', finishCall);
         socket.on('prescription.updated', () => { void loadClinicalContext(); });
         socket.on('video.error', ({ message }: { message?: string }) => setError(message || 'Could not join this consultation.'));
         socket.on('connect_error', () => setError('Could not reach the consultation server. Please check your connection.'));
-
-        void (async () => {
-          try {
-            const audioStream = await requestMediaWithTimeout(
-              { video: false, audio: { echoCancellation: true, noiseSuppression: true } },
-              6000,
-              'Microphone',
-            );
-            if (disposed) {
-              audioStream.getTracks().forEach((track) => track.stop());
-              return;
-            }
-            audioStream.getAudioTracks().forEach((track) => {
-              stream.addTrack(track);
-              if (peerRef.current && !peerRef.current.destroyed) peerRef.current.addTrack(track, stream);
-            });
-            setAudioUnavailable(false);
-          } catch (audioError) {
-            console.warn('Microphone unavailable:', audioError);
-            setAudioUnavailable(true);
-          }
-        })();
+        setMediaReady(true);
+        setStarting(false);
+        setShowPermissionHelp(false);
+        setConnected(true);
+        setStatus('Joining private Agora room...');
       } catch (mediaError) {
         mediaRequestRef.current = false;
         setStarting(false);
@@ -428,26 +278,12 @@ export default function VideoCallRoom() {
       startMediaRef.current = null;
       if (!endedRef.current) socket?.emit('video.leave');
       socket?.disconnect();
-      peerRef.current?.destroy();
-      peerRef.current = null;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
       mediaRequestRef.current = false;
     };
-  }, [call, finishCall, loadClinicalContext, playRemoteVideo, token]);
+  }, [call, finishCall, loadClinicalContext, token]);
 
   const enableMedia = () => startMediaRef.current?.();
-  const toggleAudio = () => {
-    const nextMuted = !muted;
-    streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !nextMuted; });
-    setMuted(nextMuted);
-  };
-  const toggleCamera = () => {
-    const nextOff = !cameraOff;
-    streamRef.current?.getVideoTracks().forEach((track) => { track.enabled = !nextOff; });
-    setCameraOff(nextOff);
-  };
-  const leave = () => {
+  const endCall = () => {
     const socket = socketRef.current;
     if (!socket?.connected) {
       finishCall();
@@ -538,67 +374,31 @@ export default function VideoCallRoom() {
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-neutral-950 text-white">
       <section className={`absolute inset-0 transition-[right] duration-200 ${isDoctor && panelOpen ? 'lg:right-[390px]' : ''}`}>
-        <video
-          ref={remoteVideoRef}
-          data-testid="remote-video"
-          autoPlay
-          playsInline
-          onLoadedMetadata={() => { void playRemoteVideo(); }}
-          onPlaying={() => { setRemoteVideoReady(true); setRemotePlaybackBlocked(false); }}
-          className="absolute inset-0 h-full w-full bg-neutral-950 object-contain"
-        />
+        {agoraCredentials && (
+          <AgoraCall
+            {...agoraCredentials}
+            embedded
+            userName={displayName}
+            onEnd={endCall}
+          />
+        )}
 
         {!connected && (
-          <div className="absolute inset-0 flex items-center justify-center bg-neutral-950 px-6">
-            <div className="max-w-md text-center">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-950 px-6">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center shadow-2xl">
               <ShieldCheck className="mx-auto mb-5 h-12 w-12 text-emerald-400" />
               <h1 className="text-2xl font-semibold">Private video consultation</h1>
               <p className="mt-3 text-sm leading-6 text-neutral-300">{error || status}</p>
               {!mediaReady && (
-                <button type="button" onClick={enableMedia} disabled={starting} className="mt-6 inline-flex h-12 items-center justify-center gap-2 bg-white px-5 text-sm font-semibold text-neutral-950 disabled:cursor-wait disabled:opacity-70">
+                <button type="button" onClick={enableMedia} disabled={starting} className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-neutral-950 disabled:cursor-wait disabled:opacity-70">
                   {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                  {starting ? 'Waiting for permission...' : error ? 'Try Camera Again' : 'Enable Camera & Microphone'}
+                  {starting ? 'Opening consultation...' : error ? 'Try again' : 'Join consultation'}
                 </button>
               )}
-              {showPermissionHelp && <p className="mt-4 text-xs leading-5 text-amber-300">Select the lock icon beside the URL and allow Camera and Microphone.</p>}
+              {showPermissionHelp && <p className="mt-4 text-xs leading-5 text-amber-300">In Safari, tap aA in the address bar, open Website Settings, and allow Camera and Microphone.</p>}
             </div>
           </div>
         )}
-
-        {connected && !remoteVideoReady && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center px-6 text-center">
-            <div>
-              <UserRound className="mx-auto h-12 w-12 text-neutral-500" />
-              <p className="mt-4 text-sm text-neutral-300">Connected. Waiting for the other participant's video...</p>
-            </div>
-          </div>
-        )}
-
-        {remotePlaybackBlocked && (
-          <button type="button" onClick={() => { void playRemoteVideo(); }} className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 bg-white px-5 py-3 text-sm font-semibold text-neutral-950">
-            Play participant video
-          </button>
-        )}
-
-        <div className="absolute left-4 top-4 flex items-center gap-2 bg-black/70 px-3 py-2 text-sm">
-          <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-          {mediaReady ? status : 'Camera off'}
-        </div>
-        {audioUnavailable && <div className="absolute left-4 top-16 max-w-md bg-amber-400 px-3 py-2 text-xs font-semibold text-neutral-950">Camera is on. Microphone is unavailable; close other audio apps and retry if needed.</div>}
-
-        <video ref={localVideoRef} data-testid="local-video" autoPlay muted playsInline className="absolute right-4 top-4 h-40 w-28 border border-white/20 bg-neutral-900 object-cover shadow-2xl sm:h-48 sm:w-36" />
-
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-4 bg-black/75 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-5">
-          <button type="button" onClick={toggleAudio} className={`grid h-12 w-12 place-items-center rounded-full ${muted ? 'bg-white text-neutral-950' : 'bg-white/15 text-white'}`} title={muted ? 'Unmute microphone' : 'Mute microphone'}>
-            {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </button>
-          <button type="button" onClick={leave} className="grid h-14 w-14 place-items-center rounded-full bg-red-600 text-white" title="End consultation for everyone">
-            <PhoneOff className="h-6 w-6" />
-          </button>
-          <button type="button" onClick={toggleCamera} className={`grid h-12 w-12 place-items-center rounded-full ${cameraOff ? 'bg-white text-neutral-950' : 'bg-white/15 text-white'}`} title={cameraOff ? 'Turn camera on' : 'Turn camera off'}>
-            {cameraOff ? <CameraOff className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
-          </button>
-        </div>
       </section>
 
       {isDoctor && (

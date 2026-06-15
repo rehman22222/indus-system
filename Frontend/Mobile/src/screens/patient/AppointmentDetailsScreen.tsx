@@ -1,13 +1,15 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getAppointmentById, getPrescriptions } from '@/api/domain';
 import type { Appointment, Prescription } from '@/api/types';
+import { AppointmentQrCard } from '@/components/AppointmentQrCard';
 import { useI18n } from '@/i18n/LanguageContext';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { colors, radius, shadow, spacing } from '@/theme/colors';
+import { radius, shadow, spacing } from '@/theme/colors';
+import { useTheme, type ThemeColors } from '@/theme/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppointmentDetails'>;
 
@@ -22,6 +24,8 @@ function statusKey(status?: string) {
 
 export function AppointmentDetailsScreen({ route }: Props) {
   const { t, isRtl } = useI18n();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const align = { textAlign: isRtl ? 'right' : 'left' } as const;
   const [appointment, setAppointment] = useState<Appointment>();
   const [prescription, setPrescription] = useState<Prescription>();
@@ -71,6 +75,14 @@ export function AppointmentDetailsScreen({ route }: Props) {
         <View style={styles.summaryItem}><Text style={[styles.label, align]}>{t('details.status')}</Text><Text style={[styles.value, styles.status, align]}>{appointment?.status ? t(`status.${statusKey(appointment.status)}`, appointment.status.replace(/_/g, ' ')) : '-'}</Text></View>
       </View>
 
+      {!!appointment && (
+        <AppointmentQrCard
+          appointment={appointment}
+          title={t('details.qrTitle')}
+          description={appointment.appointment_type === 'physical' ? t('details.qrCheckIn') : t('details.qrReference')}
+        />
+      )}
+
       {!!appointment?.chief_complaint && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, align]}>{t('details.reason')}</Text>
@@ -110,7 +122,8 @@ export function AppointmentDetailsScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },

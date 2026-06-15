@@ -2,21 +2,31 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import indusLogo from '@/assets/indus-logo.svg';
-import { Shield, Activity, Stethoscope, QrCode } from 'lucide-react';
+import { Shield, Activity, Stethoscope, QrCode, User } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
 
   const portals = [
     {
+      title: 'Patient Portal',
+      subtitle: 'Book & Consult',
+      desc: 'Appointments, prescriptions & video visits',
+      icon: User,
+      route: '/patient',
+      color: 'bg-chart-3',
+      iconColor: 'text-white',
+      btnClass: 'bg-chart-3 hover:bg-chart-3/90 text-white',
+    },
+    {
       title: 'Doctor Portal',
       subtitle: 'Consultant Access',
       desc: 'View patients & consultations',
       icon: Stethoscope,
       route: '/doctor',
-      color: 'bg-chart-3',
-      iconColor: 'text-white',
-      btnClass: 'bg-chart-3 hover:bg-chart-3/90 text-white',
+      color: 'bg-primary/10',
+      iconColor: 'text-primary',
+      btnClass: '',
     },
     {
       title: 'Management',
@@ -50,7 +60,7 @@ const Index = () => {
           <p className="text-sm md:text-lg text-muted-foreground">Enterprise Portal Access</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {portals.map((p) => (
             <Card key={p.route} className="p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-lg border hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               onClick={() => navigate(p.route)}>

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
-import { colors } from '@/theme/colors';
+import { useTheme, type ThemeColors } from '@/theme/ThemeContext';
 
 export function RoleUnsupportedScreen() {
   const { user, signOut } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View style={styles.root}>
@@ -20,34 +22,35 @@ export function RoleUnsupportedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: colors.background,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  body: {
-    marginTop: 12,
-    lineHeight: 22,
-    textAlign: 'center',
-    color: colors.muted,
-  },
-  button: {
-    marginTop: 24,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    backgroundColor: colors.red,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '800',
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      backgroundColor: colors.background,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    body: {
+      marginTop: 12,
+      lineHeight: 22,
+      textAlign: 'center',
+      color: colors.muted,
+    },
+    button: {
+      marginTop: 24,
+      borderRadius: 12,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      backgroundColor: colors.red,
+    },
+    buttonText: {
+      color: '#fff',
+      fontWeight: '800',
+    },
+  });

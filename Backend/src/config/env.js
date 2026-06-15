@@ -82,7 +82,15 @@ export const env = Object.freeze({
     // retained as optional fallbacks for existing deployments.
     VIDEO_PROVIDER: optional('VIDEO_PROVIDER', 'webrtc').toLowerCase(),
     CALL_WEB_BASE_URL: optional('CALL_WEB_BASE_URL', 'http://localhost:5173'),
+    DOCTOR_CALL_WEB_BASE_URL: optional('DOCTOR_CALL_WEB_BASE_URL', optional('CALL_WEB_BASE_URL', 'http://localhost:5173')),
+    PATIENT_CALL_WEB_BASE_URL: optional('PATIENT_CALL_WEB_BASE_URL', optional('CALL_WEB_BASE_URL', 'http://localhost:5173')),
     JITSI_BASE_URL: optional('JITSI_BASE_URL', 'https://meet.jit.si'),
+
+    // Agora RTC (token-based). App ID is public (sent to clients); the App
+    // Certificate is secret and only used server-side to sign tokens.
+    AGORA_APP_ID: optional('AGORA_APP_ID', ''),
+    AGORA_APP_CERTIFICATE: optional('AGORA_APP_CERTIFICATE', ''),
+    AGORA_TOKEN_TTL_SECONDS: number('AGORA_TOKEN_TTL_SECONDS', 3600, { min: 60, max: 86400 }),
 
     REDIS_URL: optional('REDIS_URL', ''),
     SOCKET_IO_REDIS_URL: optional('SOCKET_IO_REDIS_URL', optional('REDIS_URL', '')),

@@ -61,11 +61,12 @@ export function DoctorHome({
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Welcome */}
-      <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-4 md:p-6">
-        <h2 className="text-lg md:text-2xl font-bold text-foreground">
+      <div className="brand-panel relative overflow-hidden rounded-3xl p-5 text-white shadow-[0_14px_32px_rgba(18,38,67,0.18)] md:p-7">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/60">Doctor dashboard</p>
+        <h2 className="mt-1 text-xl font-extrabold text-white md:text-3xl">
           Good {getGreeting()}, Dr. {doctor.name.split(' ').slice(-1)[0]}
         </h2>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="text-sm text-white/70 mt-1">
           {completedToday} completed • {pendingToday} remaining
         </p>
       </div>

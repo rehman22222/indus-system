@@ -13,12 +13,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 export interface SendOtpResult {
   success: boolean;
   error?: string;
-  /** Only present when the function runs in OTP_DEV_MODE — the 6-digit
-   *  code generated server-side, returned directly so a developer can
-   *  test the full flow without needing real email delivery. */
-  devOtp?: string;
-  /** True when the function ran in OTP_DEV_MODE (no email sent). */
-  devMode?: boolean;
 }
 
 export interface VerifyOtpResult {
@@ -34,6 +28,16 @@ interface ApiErrorResponse {
   remainingAttempts?: number;
 }
 
+interface VerifyOtpPayload {
+  password?: string;
+  name?: string;
+  phone?: string;
+  cnic?: string;
+  age?: number;
+  gender?: string;
+  purpose?: 'signup' | 'password-reset';
+}
+
 export function useOTP() {
   const sendOTP = useCallback(
     async (email: string, name?: string): Promise<SendOtpResult> => {
@@ -46,6 +50,7 @@ export function useOTP() {
           body: JSON.stringify({
             email: email.trim().toLowerCase(),
             name: name ?? '',
+            purpose: 'signup',
           }),
         });
 
@@ -59,11 +64,7 @@ export function useOTP() {
         }
 
         if (data.success) {
-          return {
-            success: true,
-            devMode: process.env.NODE_ENV === 'development',
-            devOtp: data.code, // Only available in development mode
-          };
+          return { success: true };
         }
 
         return {
@@ -82,7 +83,12 @@ export function useOTP() {
   );
 
   const verifyOTP = useCallback(
-    async (email: string, otp: string): Promise<VerifyOtpResult> => {
+    async (
+      email: string,
+      otp: string,
+      payload: VerifyOtpPayload = {},
+      persistSession = true,
+    ): Promise<VerifyOtpResult> => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
           method: 'POST',
@@ -92,6 +98,8 @@ export function useOTP() {
           body: JSON.stringify({
             email: email.trim().toLowerCase(),
             code: otp.trim(),
+            purpose: payload.purpose || 'signup',
+            ...payload,
           }),
         });
 
@@ -106,12 +114,14 @@ export function useOTP() {
         }
 
         if (data.success) {
-          // Store the JWT token and user info
-          if (data.token) {
+          if (persistSession && data.token) {
             localStorage.setItem('auth_token', data.token);
           }
-          if (data.user) {
+          if (persistSession && data.user) {
             localStorage.setItem('user', JSON.stringify(data.user));
+          }
+          if (persistSession && data.token && data.user) {
+            window.dispatchEvent(new Event('mongo-auth-change'));
           }
 
           return { success: true, verified: true };

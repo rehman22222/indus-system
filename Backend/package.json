@@ -15,12 +15,14 @@
         "db:seed:video": "node src/scripts/seedVideoCallDemoData.js",
         "db:seed:analytics": "node src/scripts/seedAnalyticsData.js",
         "db:seed:slots": "node src/scripts/seedSlots.js",
+        "db:repair:slots": "node src/scripts/repairSlotAvailability.js",
         "db:seed:all": "npm run db:seed && npm run db:seed:analytics",
         "test": "node --test src/tests/password.service.test.js",
         "lint": "eslint src/"
     },
     "dependencies": {
         "@socket.io/redis-adapter": "^8.3.0",
+        "agora-token": "^2.0.5",
         "axios": "^1.6.7",
         "compression": "^1.7.4",
         "cors": "^2.8.5",

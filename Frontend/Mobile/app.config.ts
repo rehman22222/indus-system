@@ -6,6 +6,7 @@ const apiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   process.env.VITE_API_BASE_URL ||
   'http://localhost:5000';
+const webBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL || '';
 
 // Only reference a Firebase config file when it actually exists, otherwise
 // Expo fails to parse the config (e.g. a missing GoogleService-Info.plist).
@@ -23,6 +24,7 @@ const config: ExpoConfig = {
   version: '1.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
+  icon: './assets/icon.png',
   platforms: ['ios', 'android'],
 
   runtimeVersion: {
@@ -36,6 +38,7 @@ const config: ExpoConfig = {
 
   extra: {
     apiBaseUrl,
+    webBaseUrl,
     eas: {
       projectId:
         process.env.EAS_PROJECT_ID ||
@@ -65,9 +68,16 @@ const config: ExpoConfig = {
       'RECORD_AUDIO',
       'POST_NOTIFICATIONS',
       'VIBRATE',
+      // Agora RTC (native video calling)
+      'INTERNET',
+      'ACCESS_NETWORK_STATE',
+      'MODIFY_AUDIO_SETTINGS',
+      'BLUETOOTH',
+      'BLUETOOTH_CONNECT',
     ],
     adaptiveIcon: {
-      backgroundColor: '#C93232',
+      foregroundImage: './assets/adaptive-icon.png',
+      backgroundColor: '#BE1E2D',
     },
   },
 

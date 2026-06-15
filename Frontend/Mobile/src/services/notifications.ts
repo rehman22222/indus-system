@@ -1,6 +1,5 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
@@ -9,9 +8,20 @@ import { apiRequest } from '@/api/client';
 // only work in a development/preview build. Detect Expo Go so we skip them
 // quietly instead of logging warnings/network errors.
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
+type NotificationsModule = typeof import('expo-notifications');
+let notificationsModule: NotificationsModule | null = null;
 
-if (!isExpoGo) {
-  Notifications.setNotificationHandler({
+function getNotifications(): NotificationsModule | null {
+  if (isExpoGo) return null;
+  if (!notificationsModule) {
+    notificationsModule = require('expo-notifications') as NotificationsModule;
+  }
+  return notificationsModule;
+}
+
+const initialNotifications = getNotifications();
+if (initialNotifications) {
+  initialNotifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
@@ -56,6 +66,8 @@ async function registerBackendToken(payload: DeviceTokenPayload) {
 
 export async function registerForPushNotifications() {
   if (isExpoGo || !Device.isDevice) return null;
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('appointments', {

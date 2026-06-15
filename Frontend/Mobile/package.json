@@ -18,8 +18,10 @@
     "submit:ios": "eas submit --platform ios"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-navigation/bottom-tabs": "^7.0.0",
+    "@react-native-community/datetimepicker": "8.4.4",
+    "@react-navigation/bottom-tabs": "^7.17.1",
     "@react-navigation/native": "^7.0.0",
     "@react-navigation/native-stack": "^7.0.0",
     "babel-preset-expo": "~54.0.10",
@@ -33,11 +35,16 @@
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
+    "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-agora": "^4.5.4",
+    "react-native-qrcode-svg": "^6.3.21",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {

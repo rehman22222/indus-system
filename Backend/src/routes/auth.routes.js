@@ -68,14 +68,29 @@ router.post('/login', async (req, res, next) => {
  */
 router.post('/send-otp', async (req, res, next) => {
     try {
-        const { email } = req.body;
+        const email = String(req.body.email || '').trim().toLowerCase();
+        const purpose = req.body.purpose === 'password-reset' ? 'password-reset' : 'signup';
 
         // Validate email
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             throw new AppError('Valid email is required', 400);
         }
 
-        const result = await sendOTP(email, req.body.name);
+        const existingUser = await User.findOne({ email }).select('role').lean();
+        if (existingUser && existingUser.role !== 'patient') {
+            throw new AppError('Staff accounts must sign in with credentials provided by the administrator', 403);
+        }
+        if (purpose === 'signup' && existingUser) {
+            throw new AppError('An account already exists for this email. Please sign in or reset your password.', 409);
+        }
+        if (purpose === 'password-reset' && !existingUser) {
+            return res.status(200).json({
+                success: true,
+                message: 'If an account exists for this email, a verification code has been sent.',
+            });
+        }
+
+        const result = await sendOTP(email, req.body.name, purpose);
 
         res.status(200).json({
             success: true,
@@ -93,25 +108,29 @@ router.post('/send-otp', async (req, res, next) => {
 router.post('/verify-otp', async (req, res, next) => {
     try {
         const { email, code, password, name, phone, cnic, age, gender } = req.body;
+        const purpose = req.body.purpose === 'password-reset' ? 'password-reset' : 'signup';
 
         // Validate inputs
         if (!email || !code) {
             throw new AppError('Email and OTP code are required', 400);
         }
+        if (password && String(password).length < 8) {
+            throw new AppError('Password must be at least 8 characters', 400);
+        }
 
-        const result = await verifyOTP(email, code);
+        const result = await verifyOTP(email, code, purpose);
 
         if (!result.success) {
             return res.status(400).json(result);
         }
 
         let userDoc = result.user;
+        if (userDoc.role !== 'patient') {
+            throw new AppError('Staff accounts cannot use patient OTP registration', 403);
+        }
         const updates = {};
 
         if (password) {
-            if (String(password).length < 8) {
-                throw new AppError('Password must be at least 8 characters', 400);
-            }
             updates.password_hash = await hashPassword(password);
             updates.auth_provider = 'password';
         }
@@ -149,12 +168,28 @@ router.post('/verify-otp', async (req, res, next) => {
 router.post('/resend-otp', async (req, res, next) => {
     try {
         const { email } = req.body;
+        const purpose = req.body.purpose === 'password-reset' ? 'password-reset' : 'signup';
 
         if (!email) {
             throw new AppError('Email is required', 400);
         }
 
-        const result = await sendOTP(email, req.body.name);
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const existingUser = await User.findOne({ email: normalizedEmail }).select('role').lean();
+        if (existingUser && existingUser.role !== 'patient') {
+            throw new AppError('Staff accounts must sign in with credentials provided by the administrator', 403);
+        }
+        if (purpose === 'signup' && existingUser) {
+            throw new AppError('An account already exists for this email. Please sign in or reset your password.', 409);
+        }
+        if (purpose === 'password-reset' && !existingUser) {
+            return res.status(200).json({
+                success: true,
+                message: 'If an account exists for this email, a verification code has been sent.',
+            });
+        }
+
+        const result = await sendOTP(normalizedEmail, req.body.name, purpose);
 
         res.status(200).json({
             success: true,

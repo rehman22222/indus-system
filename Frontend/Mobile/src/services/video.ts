@@ -7,6 +7,12 @@ export type VideoRoom = {
   url: string;
   name: string;
   provider?: string;
+  // Present when provider === 'agora'
+  appId?: string;
+  channel?: string;
+  token?: string | null;
+  uid?: number;
+  expiresAt?: number;
 };
 
 /**
@@ -24,9 +30,8 @@ export async function createVideoRoom(appointmentId: string): Promise<VideoRoom>
 }
 
 /**
- * Open the consultation in the device's browser. The browser handles camera
- * and microphone permissions, so this works from Expo Go without a native
- * WebRTC module.
+ * Open the hosted consultation in the device browser. Agora's Web SDK runs on
+ * HTTPS, so this works from Expo Go without linking a native RTC package.
  */
 export async function openVideoConsultation(appointmentId: string): Promise<void> {
   const room = await createVideoRoom(appointmentId);

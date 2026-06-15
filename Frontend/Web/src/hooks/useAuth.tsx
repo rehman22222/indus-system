@@ -1,7 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@/integrations/mongodb/client';
 import type { UserRole } from '@/integrations/mongodb/types';
-import { authStore, useAuthSession } from '@/auth/authStore';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -70,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const sessionUser = useAuthSession();
 
   useEffect(() => {
     const hydrate = () => {
@@ -126,8 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
       setSession(makeSession(data.token, data.user));
       setRoles([normalizeRole(data.user.role)]);
-      authStore.logout();
-
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -136,30 +132,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     clearSession();
-    authStore.logout();
     setUser(null);
     setSession(null);
     setRoles([]);
   };
 
-  const effectiveUser: User | null = sessionUser
-    ? { id: sessionUser.email, email: sessionUser.email, role: sessionUser.role }
-    : user;
-
-  const effectiveRoles: AppRole[] = sessionUser
-    ? [normalizeRole(sessionUser.role)]
-    : roles;
-
-  const hasRole = (role: AppRole) => effectiveRoles.includes(role);
-  const isStaff = () => effectiveRoles.some((role) => role === 'ADMIN' || role === 'DOCTOR' || role === 'MANAGEMENT' || role === 'RECEPTIONIST');
+  const hasRole = (role: AppRole) => roles.includes(role);
+  const isStaff = () => roles.some((role) => role === 'ADMIN' || role === 'DOCTOR' || role === 'MANAGEMENT' || role === 'RECEPTIONIST');
 
   return (
     <AuthContext.Provider
       value={{
-        user: effectiveUser,
+        user,
         session,
-        roles: effectiveRoles,
-        isLoading: sessionUser ? false : isLoading,
+        roles,
+        isLoading,
         signUp,
         signIn,
         signOut,

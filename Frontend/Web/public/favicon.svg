@@ -1,4 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#0066cc" rx="15"/>
-  <path d="M50 20 L50 45 L25 45 L25 55 L50 55 L50 80 L60 80 L60 55 L85 55 L85 45 L60 45 L60 20 Z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="INDUS Hospital">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D8313F"/>
+      <stop offset="1" stop-color="#8E1620"/>
+    </linearGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2F4F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="26" fill="url(#bg)"/>
+  <!-- soft top sheen for depth -->
+  <path d="M0 26 Q0 0 26 0 H74 Q100 0 100 26 V40 Q50 24 0 40 Z" fill="#FFFFFF" opacity="0.10"/>
+  <!-- INDUS H monogram -->
+  <g fill="url(#h)">
+    <rect x="27" y="25" width="13.5" height="50" rx="4.5"/>
+    <rect x="59.5" y="25" width="13.5" height="50" rx="4.5"/>
+    <rect x="27" y="43.25" width="46" height="13.5" rx="3"/>
+  </g>
 </svg>

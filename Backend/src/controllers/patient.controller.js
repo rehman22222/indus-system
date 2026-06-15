@@ -73,7 +73,15 @@ export const getAllPatients = async (req, res) => {
     const filter = buildListFilter(req, { fieldMap: FIELD_MAP });
     filter.role = 'patient';
 
-    if (search) {
+    // A patient may only read their own record. The web portal queries this
+    // route as `patients.user_id == <their id>`; in this model the patient IS
+    // the User, so force the scope to self and drop client filters that don't
+    // map to the User document (e.g. user_id, search).
+    if (req.userRole === 'patient') {
+        delete filter.user_id;
+        delete filter.$text;
+        filter._id = requireObjectId(req.user.id, 'patientId');
+    } else if (search) {
         filter.$text = { $search: String(search).trim() };
     }
 

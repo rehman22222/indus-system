@@ -61,3 +61,8 @@ coverage/
 .cache/
 tmp/
 temp/
+
+# Build artifacts (too large for git)
+*.apk
+*.aab
+*.ipa

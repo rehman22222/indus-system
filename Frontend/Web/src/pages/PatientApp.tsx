@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import AppointmentQRCode from '@/components/patient/AppointmentQRCode';
 import { VideoCall } from '@/components/shared/VideoCall';
-import { getOrCreateVideoRoom } from '@/lib/videoRoom';
+import { getOrCreateVideoRoom, type VideoRoom } from '@/lib/videoRoom';
 import { IncomingCallListener } from '@/components/patient/IncomingCallListener';
 import { PatientAuthScreen } from '@/components/patient/PatientAuthScreen';
 import type { Appointment, Patient } from '@/integrations/mongodb/types';
@@ -63,6 +63,7 @@ export default function PatientApp() {
   const [videoApt, setVideoApt] = useState<Appointment | null>(null);
   const [videoRoomUrl, setVideoRoomUrl] = useState<string | null>(null);
   const [videoProvider, setVideoProvider] = useState<string>('jitsi');
+  const [videoRoom, setVideoRoom] = useState<VideoRoom | null>(null);
 
   // Success dialog state
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -109,7 +110,21 @@ export default function PatientApp() {
     return true;
   });
 
-  const timeSlots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00'];
+  const bookingSlotOptions = availableSlots
+    .map((slot) => {
+      const rawTime = typeof slot === 'string'
+        ? slot
+        : (slot as any).start_time ?? (slot as any).slot_time ?? (slot as any).time ?? (slot as any).appointment_time;
+
+      if (!rawTime) return null;
+
+      const time = String(rawTime).slice(0, 5);
+      return {
+        id: typeof slot === 'string' ? time : (slot as any).id ?? time,
+        time,
+      };
+    })
+    .filter((slot): slot is { id: string; time: string } => Boolean(slot));
 
   // Fetch slots when doctor and date are selected
   useEffect(() => {
@@ -143,6 +158,7 @@ export default function PatientApp() {
       setVideoApt(apt);
       setVideoRoomUrl(room.url);
       setVideoProvider(room.provider || 'jitsi');
+      setVideoRoom(room);
     } catch (err: any) {
       toast({ title: 'Could not join video', description: err.message, variant: 'destructive' });
     }
@@ -277,9 +293,10 @@ export default function PatientApp() {
       {/* Home Tab */}
       {activeTab === 'home' && (
         <div className="space-y-4 md:space-y-6">
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-4 md:p-6">
-            <h2 className="text-lg md:text-2xl font-bold">Welcome, {patient?.name?.split(' ')[0]}!</h2>
-            <p className="text-muted-foreground text-sm mt-1">Manage your health journey</p>
+          <div className="brand-panel relative overflow-hidden rounded-3xl p-5 text-white shadow-[0_14px_32px_rgba(18,38,67,0.18)] md:p-7">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/60">Patient dashboard</p>
+            <h2 className="mt-1 text-xl font-extrabold md:text-3xl">Welcome, {patient?.name?.split(' ')[0]}!</h2>
+            <p className="mt-1 text-sm text-white/70">Manage appointments and your health journey in one place.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -524,16 +541,16 @@ export default function PatientApp() {
                 <div className="space-y-2">
                   <Label className="text-sm">Available Slots {slotsLoading && <Loader2 className="inline h-3 w-3 animate-spin ml-1" />}</Label>
                   <div className="grid grid-cols-4 gap-2">
-                    {(availableSlots.length > 0 ? availableSlots : timeSlots.map((t, i) => ({ id: `f-${i}`, start_time: t, end_time: t, slot_type: 'physical', status: 'free' }))).map((slot) => {
-                      const time = typeof slot === 'string' ? slot : slot.start_time;
+                    {bookingSlotOptions.map((slot) => {
+                      const time = slot.time;
                       return (
-                        <Button key={typeof slot === 'string' ? slot : slot.id} variant={selectedTime === time ? "default" : "outline"}
+                        <Button key={slot.id} variant={selectedTime === time ? "default" : "outline"}
                           className="rounded-xl text-xs md:text-sm" onClick={() => setSelectedTime(time)}>
                           {time.slice(0, 5)}
                         </Button>
                       );
                     })}
-                    {availableSlots.length === 0 && !slotsLoading && selectedDoctor && (
+                    {bookingSlotOptions.length === 0 && !slotsLoading && selectedDoctor && (
                       <p className="col-span-4 text-center text-xs text-muted-foreground py-2">No slots available for this date</p>
                     )}
                   </div>
@@ -675,8 +692,12 @@ export default function PatientApp() {
         <VideoCall
           roomUrl={videoRoomUrl}
           provider={videoProvider}
+          appId={videoRoom?.appId}
+          channel={videoRoom?.channel}
+          agoraToken={videoRoom?.token}
+          uid={videoRoom?.uid}
           userName={patient?.name || 'Patient'}
-          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); refetchAppointments(); }}
+          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); setVideoRoom(null); refetchAppointments(); }}
         />
       )}
 

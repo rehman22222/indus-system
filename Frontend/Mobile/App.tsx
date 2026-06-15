@@ -6,18 +6,26 @@ import { AuthProvider } from '@/auth/AuthContext';
 import { IncomingCallProvider } from '@/components/IncomingCallProvider';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import { RootNavigator } from '@/navigation/RootNavigator';
+import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
+
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <IncomingCallProvider>
-            <RootNavigator />
-            <StatusBar style="dark" />
-          </IncomingCallProvider>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <IncomingCallProvider>
+              <RootNavigator />
+              <ThemedStatusBar />
+            </IncomingCallProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

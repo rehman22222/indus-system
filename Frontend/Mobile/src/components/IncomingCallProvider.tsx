@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/LanguageContext';
 import { connectRealtime } from '@/services/realtime';
 import { declineVideoCall, openRoomUrl } from '@/services/video';
-import { colors, radius, shadow, spacing } from '@/theme/colors';
+import { navigate } from '@/navigation/navigationRef';
+import { radius, shadow, spacing } from '@/theme/colors';
+import { useTheme, type ThemeColors } from '@/theme/ThemeContext';
 
 type IncomingCall = {
   appointmentId: string;
   roomUrl: string;
   doctorName: string;
+  provider?: string;
   token?: string;
   time?: string;
 };
@@ -26,6 +29,8 @@ const RING_PATTERN = [0, 700, 500, 700, 500, 700];
 export function IncomingCallProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [call, setCall] = useState<IncomingCall | null>(null);
   const [showReason, setShowReason] = useState(false);
   const [reason, setReason] = useState('');
@@ -61,7 +66,13 @@ export function IncomingCallProvider({ children }: { children: React.ReactNode }
   const accept = async () => {
     const current = call;
     close();
-    if (current?.roomUrl) {
+    if (!current) return;
+    // Native Agora call runs in-app; other providers open the browser room.
+    if (current.provider === 'agora') {
+      navigate('VideoCall', { appointmentId: current.appointmentId });
+      return;
+    }
+    if (current.roomUrl) {
       try {
         await openRoomUrl(current.roomUrl);
       } catch {
@@ -133,7 +144,8 @@ export function IncomingCallProvider({ children }: { children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(11,18,32,0.72)',

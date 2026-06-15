@@ -6,6 +6,8 @@ import { authMiddleware } from '../middleware/auth.js';
 import {
     createVideoRoom,
     declineVideoCall,
+    getAgoraToken,
+    getAgoraTestToken,
     getVideoContext,
     getVideoDocument,
     saveVideoPrescription,
@@ -54,6 +56,8 @@ router.post(
 // These endpoints use the short-lived signed video-call token instead of the
 // normal portal session, because mobile Safari opens the consultation directly.
 router.get('/context', asyncHandler(getVideoContext));
+router.get('/agora-token', asyncHandler(getAgoraToken));
+router.get('/agora-test-token', asyncHandler(getAgoraTestToken));
 router.get('/documents/:id', asyncHandler(getVideoDocument));
 router.put('/prescription', asyncHandler(saveVideoPrescription));
 

@@ -34,7 +34,23 @@ function resolveApiBaseUrl(): string {
   return explicit || 'http://localhost:5000';
 }
 
+function resolveWebBaseUrl(apiBaseUrl: string): string {
+  const explicit = (process.env.EXPO_PUBLIC_WEB_BASE_URL || extra.webBaseUrl || '').trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+
+  // In local development Vite and the API share the same machine.
+  if (/^http:\/\/[^/]+:5000$/i.test(apiBaseUrl)) {
+    return apiBaseUrl.replace(/:5000$/i, ':5173');
+  }
+
+  // Production deployments can serve the portal and API from one origin.
+  return apiBaseUrl.replace(/\/api\/?$/i, '');
+}
+
+const apiBaseUrl = resolveApiBaseUrl();
+
 export const env = {
-  apiBaseUrl: resolveApiBaseUrl(),
+  apiBaseUrl,
+  webBaseUrl: resolveWebBaseUrl(apiBaseUrl),
   appName: process.env.EXPO_PUBLIC_APP_NAME || 'Indus Hospital',
 };

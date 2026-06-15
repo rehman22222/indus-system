@@ -1,5 +1,5 @@
 import { apiRequest, buildQuery } from '@/api/client';
-import type { Appointment, Department, Doctor, Prescription, QueueEntry, Slot } from '@/api/types';
+import type { Appointment, Department, Doctor, Medication, Prescription, QueueEntry, Slot } from '@/api/types';
 
 export async function getDepartments() {
   const response = await apiRequest<{ departments?: Department[]; data?: Department[] }>('/api/v1/departments', {
@@ -8,12 +8,17 @@ export async function getDepartments() {
   return response.departments || response.data || [];
 }
 
-export async function getDoctors(params: { department_id?: string; search?: string } = {}) {
+export async function getDoctors(params: { department_id?: string; search?: string; email?: string } = {}) {
   const response = await apiRequest<{ doctors?: Doctor[]; data?: Doctor[] }>(
     `/api/v1/doctors${buildQuery(params)}`,
     { auth: false },
   );
   return response.doctors || response.data || [];
+}
+
+export async function getCurrentDoctor(email: string) {
+  const doctors = await getDoctors({ email: email.trim().toLowerCase() });
+  return doctors[0];
 }
 
 export async function getSlots(params: { doctor_id?: string; date?: string; available?: boolean }) {
@@ -41,7 +46,27 @@ export async function getAppointmentById(appointmentId: string) {
   return response.appointment || response.data;
 }
 
-export async function getPrescriptions(params: { appointmentId?: string } = {}) {
+export type PatientProfile = {
+  id: string;
+  full_name?: string;
+  name?: string;
+  indus_id?: string;
+  patient_id?: string;
+  email?: string;
+  phone?: string;
+  date_of_birth?: string;
+  gender?: string;
+  blood_group?: string;
+};
+
+export async function getMyProfile(userId: string) {
+  const response = await apiRequest<{ patient?: PatientProfile; data?: PatientProfile }>(
+    `/api/v1/patients/${userId}`,
+  );
+  return response.patient || response.data;
+}
+
+export async function getPrescriptions(params: { appointmentId?: string; patientId?: string } = {}) {
   const response = await apiRequest<{ prescriptions?: Prescription[]; data?: Prescription[] }>(
     `/api/v1/prescriptions${buildQuery(params)}`,
   );
@@ -74,13 +99,38 @@ export async function getQueue(params: { doctor_id?: string; date?: string }) {
   return response.queue || response.data || [];
 }
 
-export async function updateAppointmentStatus(appointmentId: string, status: string) {
+export async function updateAppointment(appointmentId: string, updates: Partial<Pick<Appointment,
+  'status' | 'notes' | 'diagnosis' | 'consent_recorded' | 'consent_recorded_at' |
+  'consultation_start_time' | 'consultation_end_time'
+>>) {
   const response = await apiRequest<{ appointment?: Appointment; data?: Appointment }>(
     `/api/v1/appointments/${appointmentId}`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(updates),
     },
   );
   return response.appointment || response.data;
+}
+
+
+export async function updateAppointmentStatus(appointmentId: string, status: string) {
+  return updateAppointment(appointmentId, { status });
+}
+
+export async function createPrescription(input: {
+  appointment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  diagnosis?: string;
+  medications: Medication[];
+  instructions?: string;
+  notes?: string;
+  follow_up_date?: string;
+}) {
+  const response = await apiRequest<{ prescription?: Prescription; data?: Prescription }>('/api/v1/prescriptions', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return response.prescription || response.data;
 }

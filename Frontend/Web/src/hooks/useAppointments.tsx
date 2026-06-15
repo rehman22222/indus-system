@@ -154,10 +154,12 @@ export function useAppointments(patientId?: string, date?: string) {
           appointment_time: input.appointment_time,
           appointment_type: input.appointment_type,
           status: 'confirmed',
-          chief_complaint: input.chief_complaint ?? null,
           no_show_score: prediction.score,
           governance_status: 'pending',
         };
+        if (input.chief_complaint?.trim()) {
+          (insertData as any).chief_complaint = input.chief_complaint.trim();
+        }
 
         const { data, error: insertErr } = await MongoDB
           .from('appointments')

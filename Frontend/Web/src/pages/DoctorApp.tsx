@@ -12,7 +12,7 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { DoctorAuthScreen } from '@/components/doctor/DoctorAuthScreen';
 import { DoctorHome } from '@/components/doctor/DoctorHome';
 import { VideoCall } from '@/components/shared/VideoCall';
-import { getOrCreateVideoRoom } from '@/lib/videoRoom';
+import { getOrCreateVideoRoom, type VideoRoom } from '@/lib/videoRoom';
 import { sendCallInvite } from '@/lib/callInvite';
 import { DoctorSchedule } from '@/components/doctor/DoctorSchedule';
 import { DoctorPrescriptions } from '@/components/doctor/DoctorPrescriptions';
@@ -79,6 +79,7 @@ export default function DoctorApp() {
   const [videoApt, setVideoApt] = useState<Appointment | null>(null);
   const [videoRoomUrl, setVideoRoomUrl] = useState<string | null>(null);
   const [videoProvider, setVideoProvider] = useState<string>('jitsi');
+  const [videoRoom, setVideoRoom] = useState<VideoRoom | null>(null);
 
   // Notify the doctor when a patient declines the incoming video call.
   useEffect(() => {
@@ -119,7 +120,12 @@ export default function DoctorApp() {
 
     try {
       const room = await getOrCreateVideoRoom(apt.id);
-      if ((room.provider || '').toLowerCase() === 'webrtc') {
+      const provider = (room.provider || 'webrtc').toLowerCase();
+
+      // Agora runs natively in-portal (the doctor's browser at localhost/https is
+      // already a secure context) — render the embedded AgoraCall, don't open the
+      // external /video-call page (which needs the patient-facing HTTPS tunnel).
+      if (provider !== 'agora' && ['webrtc', 'jitsi'].includes(provider)) {
         if (callWindow) {
           callWindow.location.replace(room.url);
           return;
@@ -129,14 +135,15 @@ export default function DoctorApp() {
         // surface instead of attempting camera access inside an iframe.
         setVideoApt(apt);
         setVideoRoomUrl(room.url);
-        setVideoProvider('webrtc');
+        setVideoProvider(provider);
         return;
       }
 
       callWindow?.close();
       setVideoApt(apt);
       setVideoRoomUrl(room.url);
-      setVideoProvider(room.provider || 'jitsi');
+      setVideoProvider(provider);
+      setVideoRoom(room);
     } catch (err: any) {
       callWindow?.close();
       toast({ title: 'Could not start video', description: err.message, variant: 'destructive' });
@@ -281,8 +288,12 @@ export default function DoctorApp() {
         <VideoCall
           roomUrl={videoRoomUrl}
           provider={videoProvider}
+          appId={videoRoom?.appId}
+          channel={videoRoom?.channel}
+          agoraToken={videoRoom?.token}
+          uid={videoRoom?.uid}
           userName={activeDoctor?.name ? `Dr. ${activeDoctor.name}` : 'Doctor'}
-          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); refetchAppointments(); }}
+          onEnd={() => { setVideoApt(null); setVideoRoomUrl(null); setVideoRoom(null); refetchAppointments(); }}
         />
       )}
 

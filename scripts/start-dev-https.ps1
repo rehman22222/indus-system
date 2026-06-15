@@ -5,6 +5,7 @@ $toolsDirectory = Join-Path $env:LOCALAPPDATA 'IndusHospitalTools'
 $cloudflared = Join-Path $toolsDirectory 'cloudflared.exe'
 $tunnelLog = Join-Path $toolsDirectory 'tunnel.log'
 $backendEnv = Join-Path $root 'Backend\.env'
+$mobileEnv = Join-Path $root 'Frontend\Mobile\.env'
 
 New-Item -ItemType Directory -Force -Path $toolsDirectory | Out-Null
 
@@ -47,6 +48,27 @@ if ($envContent -match '(?m)^CALL_WEB_BASE_URL=') {
     $envContent = "$envContent`r`nCALL_WEB_BASE_URL=$tunnelUrl`r`n"
 }
 [IO.File]::WriteAllText($backendEnv, $envContent, [Text.UTF8Encoding]::new($false))
+
+$defaultRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+    Sort-Object RouteMetric, InterfaceMetric |
+    Select-Object -First 1
+$lanIp = if ($defaultRoute) {
+    Get-NetIPAddress -InterfaceIndex $defaultRoute.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notlike '169.254.*' } |
+        Select-Object -First 1 -ExpandProperty IPAddress
+}
+
+if ($lanIp -and (Test-Path $mobileEnv)) {
+    $mobileContent = Get-Content -Raw $mobileEnv
+    $mobileApiUrl = "http://${lanIp}:5000"
+    if ($mobileContent -match '(?m)^EXPO_PUBLIC_API_BASE_URL=') {
+        $mobileContent = $mobileContent -replace '(?m)^EXPO_PUBLIC_API_BASE_URL=.*$', "EXPO_PUBLIC_API_BASE_URL=$mobileApiUrl"
+    } else {
+        $mobileContent = "$mobileContent`r`nEXPO_PUBLIC_API_BASE_URL=$mobileApiUrl`r`n"
+    }
+    [IO.File]::WriteAllText($mobileEnv, $mobileContent, [Text.UTF8Encoding]::new($false))
+    Write-Host "Mobile API URL: $mobileApiUrl" -ForegroundColor Green
+}
 
 Write-Host "Video HTTPS URL: $tunnelUrl" -ForegroundColor Green
 Write-Host 'This is a temporary development URL and is refreshed automatically whenever this command is restarted.'

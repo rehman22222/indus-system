@@ -561,7 +561,11 @@ export const mongodb: any = {
       try {
         await apiRequest('/api/auth/send-otp', {
           method: 'POST',
-          body: JSON.stringify({ email: email.trim().toLowerCase(), name: 'User' }),
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            name: 'User',
+            purpose: 'password-reset',
+          }),
         });
         return { data: {}, error: null };
       } catch (error) {

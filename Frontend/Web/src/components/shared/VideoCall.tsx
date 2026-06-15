@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Loader2, PhoneOff, ShieldCheck, Video } from 'lucide-react';
+import { AgoraCall } from '@/components/shared/AgoraCall';
 
 declare global {
   interface Window {
@@ -18,8 +19,35 @@ interface VideoCallProps {
   userName?: string;
   /** Provider from the backend (default 'jitsi'). Non-Jitsi URLs render as a plain hosted iframe. */
   provider?: string;
+  /** Agora credentials (when provider === 'agora'). */
+  appId?: string;
+  channel?: string;
+  agoraToken?: string | null;
+  uid?: number;
   /** Called when the user leaves the call. */
   onEnd: () => void;
+}
+
+/**
+ * Dispatcher: routes to the native-grade Agora call surface when the backend
+ * provider is Agora, otherwise the Jitsi/iframe path below. Kept hook-free so
+ * the conditional return doesn't break the rules of hooks.
+ */
+export function VideoCall(props: VideoCallProps) {
+  const isAgora = (props.provider || '').toLowerCase() === 'agora';
+  if (isAgora && props.appId && props.channel) {
+    return (
+      <AgoraCall
+        appId={props.appId}
+        channel={props.channel}
+        token={props.agoraToken}
+        uid={props.uid}
+        userName={props.userName}
+        onEnd={props.onEnd}
+      />
+    );
+  }
+  return <JitsiVideoCall {...props} />;
 }
 
 let jitsiScriptPromise: Promise<void> | null = null;
@@ -58,7 +86,7 @@ function parseRoom(roomUrl: string) {
  * An "Open in browser" button is always available as a fallback if embedding is
  * blocked by the provider.
  */
-export function VideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps) {
+function JitsiVideoCall({ roomUrl, userName, provider, onEnd }: VideoCallProps) {
   const isJitsi = (provider || '').toLowerCase() === 'jitsi' || /jit\.si/.test(roomUrl);
   const isBrowserOnly = (provider || '').toLowerCase() === 'webrtc';
   const containerRef = useRef<HTMLDivElement>(null);

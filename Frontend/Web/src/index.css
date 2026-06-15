@@ -20,48 +20,48 @@
 
 @layer base {
   :root {
-    /* Clean, minimal backgrounds - less red */
-    --background: 0 0% 99%;
-    --foreground: 0 0% 12%;
+    /* Shared with the mobile app: cool canvas, navy ink, crimson actions. */
+    --background: 216 24% 96%;
+    --foreground: 215 55% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 12%;
+    --card-foreground: 215 55% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 12%;
+    --popover-foreground: 215 55% 13%;
 
     /* INDUS Hospital red #BE1E2D -> HSL(354, 73%, 43%) */
     --primary: 354 73% 43%;
     --primary-foreground: 0 0% 100%;
 
     /* Softer secondary - very light gray with slight warmth */
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 25%;
+    --secondary: 216 33% 96%;
+    --secondary-foreground: 215 45% 24%;
 
-    --muted: 0 0% 95%;
-    --muted-foreground: 0 0% 40%;
+    --muted: 216 25% 94%;
+    --muted-foreground: 215 16% 47%;
 
     /* Very subtle accent - barely pink */
-    --accent: 0 0% 94%;
-    --accent-foreground: 0 0% 25%;
+    --accent: 217 32% 92%;
+    --accent-foreground: 215 55% 24%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 92%;
-    --input: 0 0% 92%;
+    --border: 216 18% 89%;
+    --input: 216 18% 87%;
     --ring: 354 73% 43%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     /* Sidebar - keep brand color but cleaner */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 20%;
+    --sidebar-foreground: 215 55% 13%;
     --sidebar-primary: 354 73% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 0 0% 20%;
-    --sidebar-border: 0 0% 92%;
+    --sidebar-accent: 216 33% 96%;
+    --sidebar-accent-foreground: 215 55% 13%;
+    --sidebar-border: 216 18% 89%;
     --sidebar-ring: 354 73% 43%;
 
     /* Chart colors - more muted */
@@ -72,8 +72,31 @@
     --chart-5: 280 55% 55%;
 
     --transition-smooth: all 0.2s ease;
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 8px 24px rgba(15, 30, 51, 0.06);
+    --shadow-elevated: 0 16px 40px rgba(15, 30, 51, 0.1);
+    --navy: 215 55% 24%;
+    --navy-dark: 215 58% 17%;
+    --primary-soft: 354 67% 95%;
+  }
+
+  .dark {
+    --background: 218 49% 8%;
+    --foreground: 210 40% 96%;
+    --card: 218 41% 13%;
+    --card-foreground: 210 40% 96%;
+    --popover: 218 41% 13%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 354 84% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 35% 18%;
+    --secondary-foreground: 210 30% 92%;
+    --muted: 217 32% 18%;
+    --muted-foreground: 215 20% 68%;
+    --accent: 216 34% 22%;
+    --accent-foreground: 210 40% 96%;
+    --border: 217 31% 23%;
+    --input: 217 31% 25%;
+    --ring: 354 84% 66%;
   }
 }
 
@@ -85,6 +108,19 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+    min-width: 320px;
+    background-image:
+      radial-gradient(circle at 8% 0%, hsl(354 73% 43% / 0.05), transparent 24rem),
+      radial-gradient(circle at 92% 8%, hsl(215 55% 24% / 0.07), transparent 28rem);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
+  }
+
+  button, a, input, textarea, select {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -222,7 +258,20 @@
 
   /* Card hover effects */
   .card-interactive {
-    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+    @apply transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0;
+    box-shadow: var(--shadow-card);
+  }
+
+  .portal-card {
+    @apply border bg-card;
+    border-radius: 1.125rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  .brand-panel {
+    background:
+      radial-gradient(circle at 100% 0%, rgba(255,255,255,.13), transparent 18rem),
+      linear-gradient(135deg, hsl(var(--navy)), hsl(var(--navy-dark)));
   }
 
   /* Focus states for accessibility */

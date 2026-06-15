@@ -6,6 +6,13 @@ export type User = {
   name?: string;
   role: UserRole;
   phone?: string;
+  date_of_birth?: string;
+  gender?: string;
+  address?: string;
+  blood_group?: string;
+  allergies?: string[];
+  current_medications?: string[];
+  medical_history?: unknown;
 };
 
 export type AuthSession = {
@@ -30,6 +37,22 @@ export type Doctor = {
   qualification?: string;
   rating?: number;
   consultation_fee?: number;
+  user_id?: string;
+  email?: string;
+  phone?: string;
+  department?: { id: string; name: string; color?: string };
+  experience_years?: number;
+  license_number?: string;
+  license_no?: string;
+  daily_physical_quota?: number;
+  daily_video_quota?: number;
+  max_patients_per_day?: number;
+  available_days?: string[];
+  available_hours?: Record<string, { start: string; end: string }>;
+  schedule?: Record<string, { start: string; end: string }>;
+  average_consultation_time?: number;
+  bio?: string;
+  languages?: string[];
 };
 
 export type Slot = {
@@ -59,8 +82,16 @@ export type Appointment = {
   status: string;
   chief_complaint?: string;
   history_summary?: string;
+  notes?: string;
+  diagnosis?: string;
+  consent_recorded?: boolean;
+  consent_recorded_at?: string;
+  consultation_start_time?: string;
+  consultation_end_time?: string;
+  created_at?: string;
+  updated_at?: string;
   doctor?: Doctor;
-  patient?: User & { full_name?: string };
+  patient?: User & { full_name?: string; patient_id?: string; dob?: string; sex?: string };
 };
 
 export type Medication = {

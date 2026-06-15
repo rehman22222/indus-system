@@ -3,7 +3,7 @@
 > Final Year Project (FYP) — a hospital management system for appointment booking,
 > real-time patient queue management, video consultations, and ML-driven analytics.
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-14
 
 ---
 
@@ -11,56 +11,56 @@
 
 A multi-role hospital platform built around the patient appointment lifecycle:
 
-- **Patients** book physical or video appointments, get a token, check in, and join a live queue.
-- **Doctors** see their schedule, manage their patient queue, run video consultations, and write prescriptions.
-- **Management** monitors daily operations, capacity, patient flow, and performance.
-- **Admin** manages doctors/departments, configures appointment rules, and views ML analytics (no-show risk, volume forecasts, disease patterns).
+- **Patients** register (email OTP), book physical or video appointments, choose a **visit type** (new / follow-up), upload reports & past prescriptions, get a token + QR, check in, join a live queue, take a **video consultation**, and view their prescriptions/history.
+- **Doctors** see their schedule, run their live patient queue, take video consultations, and write prescriptions.
+- **Management** monitors daily operations, capacity, patient flow, performance, broadcasts announcements, and can pause online booking.
+- **Admin** manages doctors/departments, system settings, audit logs, and ML analytics.
 - **Receptionist** runs the front-desk check-in kiosk.
 
-The system is currently **mid-migration from Supabase (PostgreSQL) to MongoDB Atlas**. The backend and analytics services are fully MongoDB-backed; the web frontend still uses a Supabase-compatible client shim that proxies to the Express API.
+The system was **migrated from Supabase (PostgreSQL) to MongoDB Atlas**. The backend and analytics services are fully MongoDB-backed; the web frontend still uses a Supabase-compatible client shim that proxies to the Express API.
+
+### Available on two clients
+- **Web app** (`Frontend/Web/`): all four staff/patient portals — **Admin, Management, Doctor, and Patient** — plus the check-in kiosk and the in-browser video-call room.
+- **Native mobile app** (`Frontend/Mobile/`, Expo): **Patient** and **Doctor** roles, with a tabbed dashboard, dark mode, and English/Urdu support.
 
 ---
 
 ## 2. Tech stack
 
 ### Backend API (`Backend/`)
-- **Runtime:** Node.js 18+ (ES Modules)
-- **Framework:** Express 4
+- **Runtime:** Node.js 18+ (ES Modules) · **Framework:** Express 4
 - **Database:** MongoDB Atlas via **Mongoose 8**
-- **Auth:** JWT (`jsonwebtoken`) + email OTP
-- **Email:** Resend (OTP + appointment confirmation)
+- **Auth:** JWT (`jsonwebtoken`) + email OTP · **Passwords:** scrypt
+- **Email:** **Gmail SMTP via Nodemailer** (primary) with **Resend** fallback — selectable by `EMAIL_PROVIDER`
 - **Push:** Firebase Admin (FCM)
-- **Realtime:** Socket.IO (+ optional Redis adapter)
+- **Realtime:** Socket.IO (+ optional Redis adapter), incl. WebRTC signaling
 - **Cache:** Redis (`redis`) with in-memory fallback
-- **Video:** Daily.co REST API
+- **Video tokens:** **Agora** (`agora-token`) for native/web RTC; Daily.co REST optional
 - **Security/infra:** Helmet, CORS, express-rate-limit, express-validator, compression, morgan
 
 ### Analytics service (`Backend/Analytics/`)
-- **Runtime:** Python
-- **Framework:** FastAPI + Uvicorn
-- **Database:** MongoDB via **PyMongo**
-- **ML / data:** XGBoost (no-show risk), Prophet (volume forecast), scikit-learn / Random Forest (disease patterns), SHAP (explainability), Polars + Pandas (data pipeline)
+- **Python** + **FastAPI** + Uvicorn · **DB:** MongoDB via **PyMongo**
+- **ML:** XGBoost (no-show risk), Prophet (volume forecast), Random Forest (disease patterns), SHAP (explainability), Pandas/Polars pipeline
 - **Realtime:** WebSocket dashboard, scheduled retraining
 
 ### Web app (`Frontend/Web/`)
-- **Framework:** React 18 + Vite + TypeScript
-- **UI:** Tailwind CSS + shadcn/ui (Radix) + Lucide icons
-- **State/data:** React Context + custom hooks + TanStack Query
-- **Routing:** React Router 6
-- **Realtime:** socket.io-client
-- **Extras:** QR codes, WebRTC video, Groq AI helper, date-fns
+- **React 18 + Vite + TypeScript** · **UI:** Tailwind + shadcn/ui (Radix) + Lucide
+- **Data:** Supabase-compatible Mongo client shim + custom hooks + TanStack Query
+- **Routing:** React Router 6 (lazy pages) · **Realtime:** socket.io-client
+- **Video:** in-browser WebRTC room + **Agora Web SDK** (`agora-rtc-sdk-ng`) · **QR codes**, date-fns
 
 ### Native mobile app (`Frontend/Mobile/`)
-- **Framework:** Expo SDK 56 + React Native + TypeScript
-- **Navigation:** React Navigation
-- **Storage:** Expo SecureStore
-- **Push:** Expo Notifications
-- **Video:** Daily.co native
-- **Build:** EAS Build / EAS Submit
+- **Expo SDK 54** + React Native + TypeScript (Expo Go compatible, except native video)
+- **Navigation:** React Navigation — native stack + **bottom tabs**
+- **Theming:** custom **ThemeContext** (light/dark, persisted) — full dark mode
+- **i18n:** custom **LanguageContext** — **English / Urdu** with RTL
+- **Storage:** AsyncStorage + Expo SecureStore · **Push:** Expo Notifications
+- **Docs:** expo-document-picker / expo-file-system / expo-sharing (report/prescription upload + view)
+- **Video:** **native Agora** (`react-native-agora`) — requires a custom dev build (not Expo Go)
 - Connects **only** to the Express backend API.
 
 ### Legacy/duplicate frontend (`Frontend/App/`)
-- React Native Web built with webpack. Contains a nested duplicate (`Frontend/App/APP/`). Superseded by `Frontend/Mobile/` — cleanup candidate.
+- React Native Web (webpack), with a nested duplicate (`Frontend/App/APP/`). Superseded by `Frontend/Mobile/` and `Frontend/Web/` — **cleanup candidate**.
 
 ---
 
@@ -70,71 +70,57 @@ The system is currently **mid-migration from Supabase (PostgreSQL) to MongoDB At
 fyp/
 ├── Backend/
 │   ├── src/
-│   │   ├── config/
-│   │   │   ├── env.js              # Validated env loader (freezes config)
-│   │   │   └── mongodb.js          # Mongoose connection + health
-│   │   ├── models/
-│   │   │   └── index.js            # All 14 Mongoose schemas + indexes
-│   │   ├── middleware/
-│   │   │   ├── auth.js             # JWT verify, requireRole, optionalAuth
-│   │   │   ├── errorHandler.js     # Global handler, AppError, asyncHandler
-│   │   │   └── validator.js        # express-validator result handler
-│   │   ├── controllers/            # Domain logic (appointment, doctor, queue, ...)
-│   │   ├── routes/                 # Express routers (one per domain + data shim)
-│   │   ├── services/
-│   │   │   ├── otp.service.js      # OTP generate/verify (hashed)
-│   │   │   ├── email.service.js    # Resend email templates
-│   │   │   ├── password.service.js # scrypt hash/verify
-│   │   │   ├── cache.service.js    # Redis + in-memory cache
-│   │   │   └── realtime.service.js # Socket.IO queue events
-│   │   ├── scripts/                # db seed + ensure-indexes
-│   │   ├── utils/                  # mongo.js, api.js (query builders)
-│   │   └── server.js               # App entry point
-│   └── Analytics/
-│       ├── api/                    # FastAPI app, routes, auth, middleware
-│       ├── data/                   # mongodb_client, loader, preprocessor, features
-│       ├── models/                 # risk, volume, disease, ensemble, trainer
-│       ├── explainability/         # SHAP
-│       ├── realtime_dashboard/     # WebSocket live stats
-│       ├── scheduler/              # retrain scheduler
-│       └── saved_models/           # persisted .pkl models
+│   │   ├── config/        # env.js (validated loader), mongodb.js (connection + health)
+│   │   ├── models/index.js   # All 15 Mongoose schemas + indexes
+│   │   ├── middleware/    # auth.js, errorHandler.js, validator.js, rateLimitStore.js
+│   │   ├── controllers/   # appointment, doctor, patient, queue, prescription, document,
+│   │   │                  #   video, notification, admin, management, analytics, ...
+│   │   ├── routes/        # one router per domain + /api/v1/data shim
+│   │   ├── services/      # otp, email, password, cache, realtime, agora,
+│   │   │                  #   notificationQueue, push
+│   │   ├── scripts/       # db seed + ensure-indexes + seedSlots
+│   │   ├── utils/         # mongo.js, api.js (query/projection/sort builders)
+│   │   ├── cluster.js     # multi-core cluster entry
+│   │   └── server.js      # app entry point
+│   └── Analytics/         # FastAPI ML service (api, data, models, explainability,
+│                          #   realtime_dashboard, scheduler, saved_models)
 ├── Frontend/
-│   ├── Web/                        # React + Vite web app (admin/mgmt/doctor)
-│   ├── Mobile/                     # Expo native app (patient/doctor)
-│   └── App/                        # Legacy RN-Web (webpack) — duplicate
-├── Database/                       # Legacy Supabase SQL schema (00–05_*.sql)
-├── docs/                           # Architecture docs (mongodb.md is current)
-├── SETUP.txt                       # Quick setup guide
-└── package.json                    # Root orchestration scripts
+│   ├── Web/               # React + Vite — Admin/Management/Doctor/Patient/Kiosk/Video
+│   ├── Mobile/            # Expo native app — Patient + Doctor
+│   └── App/               # Legacy RN-Web (webpack) — duplicate, unused
+├── Database/              # Legacy Supabase SQL schema (00–05_*.sql) — reference only
+├── docs/                  # Architecture docs (mongodb.md, scalability.md, redis.md, ...)
+├── poster/               # 4K project poster (SVG + PNG)
+├── scripts/start-dev-https.ps1   # Cloudflare quick-tunnel for the HTTPS video page
+├── SETUP.txt
+└── package.json          # Root orchestration scripts
 ```
 
 ---
 
-## 4. Data model (MongoDB collections)
+## 4. Data model (15 MongoDB collections)
 
 Defined in [Backend/src/models/index.js](Backend/src/models/index.js). Timestamps use `created_at` / `updated_at`.
 
-| Collection | Purpose | Key fields / indexes |
+| Collection | Purpose | Notable fields |
 |---|---|---|
-| `users` | All roles (patient/doctor/admin/management/receptionist) | unique partial `email`, `phone`; text index on name/email/phone; `push_tokens[]` for FCM/APNs/Expo |
-| `doctors` | Doctor profiles | `department_id`, `specialty`, `is_available`; unique partial `license_number`; text index |
-| `departments` | Hospital departments | unique `name`, icon/color, `head_doctor_id` |
-| `slots` | Doctor availability | unique `(doctor_id, date, start_time)`; `max_patients`/`current_patients` |
-| `appointments` | Bookings | unique `token`; status enum; `(patient_id, doctor_id, slot_id)` partial-unique for active; video room fields |
-| `prescriptions` | Medications | `appointment_id`, `doctor_id`, `patient_id`, `medications[]` |
-| `medical_records` | Patient history | `record_type` enum, `recorded_date` |
+| `users` | All roles | partial-unique `email`/`phone`; `gender`, `date_of_birth`, `medical_history` (holds `cnic`/`age` from signup); `push_tokens[]` |
+| `doctors` | Doctor profiles | `department_id`, `specialty`, `max_patients_per_day`, **`daily_video_quota`**, `available_hours`, `is_available` |
+| `departments` | Departments | unique `name`, icon/color |
+| `slots` | Doctor availability | unique `(doctor_id, date, start_time)`, capacity counters |
+| `appointments` | Bookings | unique `token`; status enum; **`visit_type`** (new/follow_up); `history_summary`; consultation timestamps; video room fields |
+| `prescriptions` | Medications | `appointment_id`, `medications[]`, instructions, follow-up |
+| `medical_records` | Patient history | `record_type`, `recorded_date` |
+| **`medical_documents`** | **Reports / past prescriptions** | base64 file storage (`data` select:false), `kind` (report/prescription/other), `appointment_id` |
 | `queue` | Live patient queue | unique `appointment_id`, `position`, status |
-| `notifications` | In-app/push | `user_id`, `read`, `data` |
-| `otp_verifications` | OTP codes | hashed `code_hash`, **TTL index** on `expires_at` |
+| `notifications` | In-app/push | `user_id`, `read`, broadcast support |
+| `otp_verifications` | OTP codes | hashed `code_hash`, **TTL index** |
 | `analytics_events` | Tracking | `event_type`, `event_data` |
-| `audit_logs` | Audit trail | `action`, `collection_name`, `record_id`, old/new data |
-| `system_settings` | Config | unique `setting_key` |
-| `appointment_rules` | Governance | `rule_type` enum, `rule_config`, `priority` |
+| `audit_logs` | Audit trail | `action`, `collection_name`, old/new data |
+| `system_settings` | Config | unique `setting_key` (e.g. `slots_blocked`) |
+| `appointment_rules` | Governance | `rule_type`, `rule_config`, `priority` |
 
 **Appointment statuses:** `scheduled, confirmed, waiting, called, in_consultation, completed, cancelled, no_show, rescheduled`
-(legacy `in-progress`/`no-show` auto-normalized).
-
-**Queue statuses:** `waiting, called, in_consultation, completed, no_show`
 
 ---
 
@@ -142,198 +128,177 @@ Defined in [Backend/src/models/index.js](Backend/src/models/index.js). Timestamp
 
 Base URL: `http://localhost:5000`
 
-| Route prefix | Module | Notes |
-|---|---|---|
-| `/api/auth` | login, send-otp, verify-otp, resend-otp | JWT issuance |
-| `/api/v1/otp` | OTP controller | identifier-based OTP |
-| `/api/v1/appointments` | CRUD + patient/doctor scoped lists | transactional booking |
-| `/api/v1/doctors` | List/detail/create/update + slots | cached, text search |
-| `/api/v1/departments` | List/detail/create | cached |
-| `/api/v1/patients` | List/detail/create/update | role-scoped |
-| `/api/v1/slots` | List/detail/create/update | cached |
-| `/api/v1/queue` | Live queue + status updates | emits Socket.IO events |
-| `/api/v1/prescriptions` | CRUD | doctor/patient scoped |
-| `/api/v1/notifications` | List/update/send/bulk/register-token | FCM via Firebase Admin |
-| `/api/v1/video` | create-room | Daily.co |
-| `/api/v1/analytics` | risks/diseases/volume/explain/live/train | proxies Python service |
-| `/api/v1/admin` | dashboard, audit logs, system settings | staff only |
-| `/api/v1/management` | dashboard, operational appointments | staff only |
-| `/api/v1/data/:collection` | **Supabase-compat shim** | generic CRUD fallback for legacy frontend queries |
-| `/health` | DB readiness + uptime | skips rate limit |
+| Route prefix | Notes |
+|---|---|
+| `/api/auth` | login, **send-otp**, **verify-otp** (signup stores name/phone/gender/cnic/age), resend-otp, password-reset |
+| `/api/v1/appointments` | transactional booking, status, reassign; role-scoped lists; emits realtime events |
+| `/api/v1/doctors` | list/detail/create/update (+ `daily_video_quota`), slots; emits `queue.updated` on change |
+| `/api/v1/departments`, `/api/v1/slots`, `/api/v1/patients` | CRUD; **patients may read their own profile (self-scoped)** |
+| `/api/v1/queue` | live queue + status updates → Socket.IO |
+| `/api/v1/prescriptions` | doctor/patient scoped CRUD |
+| **`/api/v1/documents`** | **upload / list / view** medical documents (base64), patient + staff |
+| `/api/v1/notifications` | list/update/send/bulk/register-token; **broadcast fan-out** to a role or all users |
+| **`/api/v1/video`** | `create-room`, `decline`, `context`, **`agora-token`**, **`agora-test-token`** (dev), `documents/:id`, `prescription` |
+| `/api/v1/analytics` | proxies the Python ML service |
+| `/api/v1/admin` · `/api/v1/management` | dashboards, audit logs, system settings (filterable by key) |
+| `/api/v1/data/:collection` | Supabase-compat shim (generic CRUD) for legacy web hooks |
+| `/health` | DB readiness, cache/realtime/notification status flags |
 
-### Key backend behaviors
-- **Transactional booking** ([appointment.controller.js](Backend/src/controllers/appointment.controller.js)): atomically reserves slot (optimistic `current_patients < max_patients`), generates unique token, creates appointment + queue entry + audit log + notification in one Mongo transaction.
-- **Role scoping**: patients see only their data; doctors see only their patients/appointments; staff (admin/management/receptionist) see all.
-- **Caching**: read endpoints use `getOrSetCache`; writes call `invalidateCache` with namespace patterns (`appointments:*`, `slots:*`, `queue:*`, `dashboard:*`, ...).
-- **Realtime**: queue/appointment changes emit Socket.IO events (`queue.updated`, `patient.checked_in`, `patient.called`, `consultation.started/completed`, `appointment.cancelled`) to `queue` and `doctor:<id>` rooms.
+### Key behaviors
+- **Transactional booking** — atomically reserves slot, generates token, creates appointment + queue entry + audit log in one transaction; honors the `slots_blocked` system setting (management can pause online booking).
+- **Realtime** — appointment/queue/doctor changes emit Socket.IO events (`queue.updated`, `patient.checked_in/called`, `consultation.started/completed`, `appointment.cancelled`) so all open portals update live.
+- **Role scoping** — patients see only their own data (incl. their own patient profile); doctors see only their patients; staff see all.
+- **Caching** — read endpoints use `getOrSetCache`; writes `invalidateCache` namespaced patterns.
 
 ---
 
-## 6. Analytics service (Python ML)
+## 6. Video consultation architecture
 
-Base URL: `http://localhost:8000`
+Selectable via **`VIDEO_PROVIDER`** (`webrtc` default · `agora` · `jitsi` · `daily`). The doctor starts the call → the patient is **rung in real time** (`call:incoming`) and can accept (with consent) or decline with a reason (`call:declined`).
+
+- **`agora`** (preferred for native): backend mints short-lived **Agora RTC tokens** ([agora.service.js](Backend/src/services/agora.service.js) via `agora-token`); channel = `indus-appointment-<id>`, per-role uid.
+  - **Web** (doctor + the `/agora-test` page) uses **`agora-rtc-sdk-ng`**.
+  - **Mobile** patient uses **native `react-native-agora`** ([NativeVideoCallScreen](Frontend/Mobile/src/screens/shared/NativeVideoCallScreen.tsx)) — **no browser/tunnel needed**, but requires a **custom Expo dev build** (won't run in Expo Go).
+- **`webrtc`** (default fallback): a self-hosted room at the web `/video-call` page using `RTCPeerConnection` + Socket.IO signaling. Because the mobile browser needs HTTPS for the camera, dev serves this page through a **Cloudflare quick-tunnel** (`scripts/start-dev-https.ps1`, writing `CALL_WEB_BASE_URL`).
+- **`jitsi`** / **`daily`**: optional hosted providers retained behind the same switch.
+
+---
+
+## 7. Analytics service (Python ML)
+
+Base URL: `http://localhost:8000` (docs at `/docs`)
 
 | Endpoint | Model | Output |
 |---|---|---|
-| `GET /api/predict/risks` | XGBoost | No-show risk per upcoming appointment + top factors |
-| `GET /api/predict/diseases` | Random Forest | Specialty-level disease burden forecast |
-| `GET /api/forecast/volume` | Prophet | Patient volume forecast with confidence intervals |
-| `GET /api/predict/ensemble` | Combined | Highest-accuracy aggregate |
-| `GET /api/explain/{patient_id}` | SHAP | Why a patient was flagged high-risk |
-| `GET /api/stats/live` + `/stats/summary` | — | Real-time dashboard stats |
-| `POST /api/train` | — | Trigger retraining (admin) |
+| `GET /api/predict/risks` | XGBoost | No-show risk per appointment + factors |
+| `GET /api/predict/diseases` | Random Forest | Specialty disease burden |
+| `GET /api/forecast/volume` | Prophet | Patient volume forecast |
+| `GET /api/predict/ensemble` | Combined | Aggregate prediction |
+| `GET /api/explain/{patient_id}` | SHAP | Why a patient is high-risk |
+| `GET /api/stats/live` · `/stats/summary` | — | Live dashboard stats |
+| `POST /api/train` | — | Trigger retraining |
 
-- Reads MongoDB directly via [mongodb_client.py](Backend/Analytics/data/mongodb_client.py) using the same `MONGODB_URI` / `MONGODB_DB_NAME`.
-- **Target-leakage guard** ([feature_engineer.py](Backend/Analytics/data/feature_engineer.py)): excludes the DB's precomputed `no_show_risk_score` and history-derived rates from model inputs; uses only prediction-time-knowable features (date parts, hour, lead days, specialty/age encodings).
-- Models persist to `saved_models/*.pkl`; auto-retrains if the saved feature count drifts.
-- All `/api` routes optionally guarded by `ANALYTICS_API_KEY`.
+- Reads MongoDB directly; **target-leakage guard** excludes precomputed scores from inputs.
+- Models persist to `saved_models/*.pkl`; auto-retrains on feature drift. Routes optionally guarded by `ANALYTICS_API_KEY`.
 
 ---
 
-## 7. Frontend architecture (Web)
+## 8. Frontend — Web
 
-- **Supabase-compatible client** ([integrations/mongodb/client.ts](Frontend/Web/src/integrations/mongodb/client.ts)): exposes `MongoDB.from('collection').select().eq()...` plus `.auth`, `.channel`, `.rpc`. Translates query-builder calls into REST calls — domain routes when available, else the `/api/v1/data` shim. This let dozens of existing hooks keep working through the migration.
-- **`safeQuery`** ([lib/safeQuery.ts](Frontend/Web/src/lib/safeQuery.ts)): wraps every query with graceful fallback (never throws; returns fallback on network/schema errors).
-- **Hybrid auth** ([auth/AuthGate.tsx](Frontend/Web/src/auth/AuthGate.tsx), [auth/authStore.ts](Frontend/Web/src/auth/authStore.ts)):
-  - Staff (admin/doctor/management/receptionist) live in an in-memory `authStore` (persisted account registry, non-persisted session → always shows login on fresh launch).
-  - Patients authenticate via OTP and are routed to the **mobile handoff** (`/patient` → mobile-only page) on web.
-- **Routing** ([App.tsx](Frontend/Web/src/App.tsx)): `/admin`, `/management`, `/doctor`, `/check-in` (kiosk), `/patient` (mobile handoff), `/reset-password`. Lazy-loaded pages, TanStack Query provider.
-- **Role → route map:** ADMIN→`/admin`, MANAGEMENT→`/management`, DOCTOR→`/doctor`, PATIENT→`/patient`, RECEPTIONIST→`/check-in`.
+- **Supabase-compatible client** ([integrations/mongodb/client.ts](Frontend/Web/src/integrations/mongodb/client.ts)): `MongoDB.from('collection').select().eq()...` plus `.auth`, `.channel`, `.rpc` → translated to REST (domain routes or the `/api/v1/data` shim). `safeQuery` wraps queries with graceful fallback.
+- **Hybrid auth** ([AuthGate.tsx](Frontend/Web/src/auth/AuthGate.tsx)): staff live in an in-memory `authStore`; patients authenticate via OTP. All roles route to their portal.
+- **Routes** ([App.tsx](Frontend/Web/src/App.tsx)): `/` (portal picker), `/admin`, `/management`, `/doctor`, **`/patient`** (full patient dashboard — booking, appointments, prescriptions, history, profile, video), `/check-in` (kiosk), `/video-call` (consultation room), `/agora-test` (Agora connectivity check), `/reset-password`.
+
+## 9. Frontend — Mobile (Expo, patient + doctor)
+
+- **Navigation** ([RootNavigator.tsx](Frontend/Mobile/src/navigation/RootNavigator.tsx)):
+  - **Patient** → bottom-tab dashboard ([PatientTabs.tsx](Frontend/Mobile/src/navigation/PatientTabs.tsx)): **Home · Appointments · Doctors · History · Profile**, plus pushed **Book Appointment** and **Appointment Details** screens.
+  - **Doctor** → home with custom tabs (overview / schedule / Rx history / profile) + clinical workspace.
+- **Shared INDUS branding** — navy logo header ([PortalHeader.tsx](Frontend/Mobile/src/components/PortalHeader.tsx)) matching the doctor portal.
+- **Premium Doctors page** — doctor profile cards (specialty, department, rating, experience, fee, languages) with a Book CTA.
+- **Dark mode** — [ThemeContext.tsx](Frontend/Mobile/src/theme/ThemeContext.tsx) (light/dark INDUS palettes, persisted) + a sun/moon toggle in both portal headers.
+- **English / Urdu** — [LanguageContext.tsx](Frontend/Mobile/src/i18n/LanguageContext.tsx) with RTL, toggle in the header.
+- **Signup parity with web** — First/Last name, **CNIC (13 digits)**, phone, age, gender, password; OTP email verification; plus a **forgot-password** (OTP reset) flow.
+- **Document upload/view** — attach report/prescription images or PDFs during booking; open them via share sheet.
+- **QR token** ([AppointmentQrCard.tsx](Frontend/Mobile/src/components/AppointmentQrCard.tsx)); incoming-call ring ([IncomingCallProvider.tsx](Frontend/Mobile/src/components/IncomingCallProvider.tsx)).
 
 ---
 
-## 8. Environment variables
+## 10. Environment variables (`Backend/.env`)
 
-### Backend (`Backend/.env`)
 ```
-PORT=5000
-NODE_ENV=development
-OTP_DEV_MODE=true
-MONGODB_URI=<atlas-uri>
-MONGODB_DB_NAME=doctorappointment
-MONGODB_AUTO_INDEX=false
-MONGODB_ENSURE_INDEXES_ON_STARTUP=false
-JWT_SECRET=<strong-secret>
-JWT_EXPIRES_IN=24h
-OTP_HASH_SECRET=<strong-secret>     # falls back to JWT_SECRET
-OTP_EXPIRY_MINUTES=10
-RESEND_API_KEY=<key>
-OTP_FROM_EMAIL / OTP_FROM_NAME
-DAILY_API_KEY / DAILY_API_URL       # video (production)
-FCM_PROJECT_ID / FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY   # push (production)
+PORT=5000 · NODE_ENV=development · OTP_DEV_MODE=false
+MONGODB_URI=<atlas-uri> · MONGODB_DB_NAME=doctorappointment
+JWT_SECRET / OTP_HASH_SECRET / JWT_EXPIRES_IN / OTP_EXPIRY_MINUTES
+
+# Email (OTP + confirmations) — SMTP preferred, Resend fallback
+EMAIL_PROVIDER=smtp                     # auto | smtp | resend
+SMTP_HOST=smtp.gmail.com · SMTP_PORT=465 · SMTP_SECURE=true
+SMTP_USER=<gmail> · SMTP_PASS=<gmail app password>
+OTP_FROM_EMAIL=<sender> · OTP_FROM_NAME=INDUS Hospital
+RESEND_API_KEY=<key>                    # fallback only
+
+# Video
+VIDEO_PROVIDER=agora                    # webrtc | agora | jitsi | daily
+AGORA_APP_ID=<id> · AGORA_APP_CERTIFICATE=<secret> · AGORA_TOKEN_TTL_SECONDS=3600
+CALL_WEB_BASE_URL=<https tunnel/domain> · JITSI_BASE_URL · DAILY_API_KEY
+
+FCM_PROJECT_ID / FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY   # push
 ANALYTICS_API_URL=http://localhost:8000
-CORS_ORIGINS / CORS_ORIGIN
-RATE_LIMIT_* / AUTH_RATE_LIMIT_*
-REDIS_URL / SOCKET_IO_REDIS_URL     # optional scaling
-CACHE_ENABLED / CACHE_DEFAULT_TTL_SECONDS
+REDIS_URL / SOCKET_IO_REDIS_URL · CACHE_ENABLED · RATE_LIMIT_* · TRUST_PROXY
 ```
 
-### Analytics (`Backend/Analytics/.env`)
-```
-MONGODB_URI
-MONGODB_DB_NAME=doctorappointment
-USE_MOCK_DATA=false
-CORS_ORIGINS
-ANALYTICS_API_KEY    # optional
-```
+Web: `VITE_API_BASE_URL`, `VITE_ML_API_URL`. Mobile auto-derives the API host from Metro (`EXPO_PUBLIC_API_BASE_URL` optional). **All secrets (Mongo, JWT, SMTP, Agora cert, Firebase) live on the backend only.**
 
-### Web (`Frontend/Web/.env`)
-```
-VITE_API_BASE_URL=http://localhost:5000
-VITE_API_URL=http://localhost:5000
-VITE_ML_API_URL=http://localhost:8000
-VITE_FIREBASE_* / VITE_DAILY_API_KEY / VITE_GROQ_API_KEY   # optional
-```
-
-### Mobile (`Frontend/Mobile/.env`)
-```
-EXPO_PUBLIC_API_BASE_URL=http://<host>:5000
-EXPO_PUBLIC_APP_NAME="Indus Hospital"
-```
-
-> **Rule:** MongoDB URI, JWT/OTP secrets, Resend/Daily/Firebase keys live on the **backend only**. Frontend/mobile talk to the API exclusively.
+> ⚠️ Several live keys were used during development (SMTP app password, Agora App Certificate, Firebase, Resend). **Rotate them before any production/submission.**
 
 ---
 
-## 9. Setup & run
+## 11. Setup & run
 
 ```bash
-# 1. Install
+# Install
 cd Backend && npm install && cd ..
 cd Frontend/Web && npm install && cd ../..
-cd Frontend/Mobile && npm install && cd ../..   # optional
+cd Frontend/Mobile && npm install && cd ../..
 
-# 2. Configure: copy each .env.example to .env and fill in keys
+# Seed
+cd Backend && npm run db:ensure-indexes && npm run db:seed:all && cd ..
 
-# 3. Seed the database
-cd Backend
-npm run db:ensure-indexes
-npm run db:seed            # demo departments/users/doctors/slots/appointments
-npm run db:seed:all        # + analytics demo data
-cd ..
+# Run (repo root)
+npm run dev            # backend + web
+npm run dev:analytics  # Python ML service
+npm run dev:https      # (optional) Cloudflare tunnel for the webrtc video page
 
-# 4. Run (from repo root)
-npm run dev                # backend + web
-npm run web                # backend + mobile-web demo
-npm run dev:analytics      # Python analytics service
-npm run dev:mobile         # Expo native app
+# Mobile — run from Frontend/Mobile with the LOCAL Expo SDK 54 (not repo root)
+npm run dev:mobile:expo-go     # Expo Go (everything except native Agora video)
+# native Agora video needs a dev build: eas build -p android --profile development
 ```
 
 | Service | URL |
 |---|---|
 | Backend API | http://localhost:5000 |
-| Web app | http://localhost:5173 |
-| Mobile web demo | http://localhost:3001 |
+| Web app (all 4 portals) | http://localhost:5173 |
 | Analytics API | http://localhost:8000 |
 
 ---
 
-## 10. Demo credentials
+## 12. Demo credentials
 
 All demo users: password **`123456`**.
 
-| Role | URL | Email |
+| Role | Where | Email |
 |---|---|---|
-| Admin | /admin | `admin@gmail.com` |
-| Management | /management | `management1@indus.org.pk` |
-| Doctor | /doctor (web) or mobile | `doctor1@indus.org.pk` |
-| Patient | mobile / http://localhost:3001 | `patient1@example.com` |
+| Admin | web `/admin` | `admin@gmail.com` |
+| Management | web `/management` | `management1@indus.org.pk` |
+| Doctor | web `/doctor` or mobile | `doctor1@indus.org.pk` |
+| Patient | web `/patient` or mobile | `patient1@example.com` |
 
-In **OTP dev mode** (`OTP_DEV_MODE=true`) the OTP code is returned in the API response and printed to the backend console.
-
----
-
-## 11. Testing
-
-| Target | Command |
-|---|---|
-| Backend | `npm run test:backend` (node --test) |
-| Analytics | `npm run test:analytics` (pytest) |
-| Web | `npm run test:web` |
-| Type-check mobile | `npm run verify:mobile` |
-| Full verify | `npm run verify` |
+New patients self-register with email OTP (delivered via Gmail SMTP). In `OTP_DEV_MODE=true` the code is printed to the backend console instead of emailed.
 
 ---
 
-## 12. Current state & known issues
+## 13. Recent updates (this cycle)
 
-- **Migration in progress:** Backend + Analytics are fully MongoDB. The web frontend still uses the Supabase-compatible client shim (proxying to the Express API) rather than calling domain routes directly.
-- **Stale docs:** [docs/database.md](docs/database.md) and [docs/backend.md](docs/backend.md) still describe Supabase/PostgreSQL with find-replace artifacts (e.g. `"mongoose + MongoDB API client"`). [docs/mongodb.md](docs/mongodb.md) and [docs/credentials.md](docs/credentials.md) are current/accurate.
-- **Duplicate frontend:** `Frontend/App/` and the nested `Frontend/App/APP/` are near-identical RN-Web copies, superseded by `Frontend/Mobile/` — cleanup candidate.
-- **Legacy SQL:** `Database/*.sql` is the old Supabase schema, kept for reference only.
-- **Git:** single initial commit; the entire Supabase→Mongo migration currently lives in the uncommitted working tree.
+- **Email/OTP fixed** — switched OTP delivery from sandboxed Resend to **Gmail SMTP**; signup now works for any email (web + mobile).
+- **Mobile patient app redesigned** — 5-tab dashboard, navy INDUS-logo header, premium Doctors page, **dark mode**, **EN/Urdu**, web-parity signup + forgot-password.
+- **Patient web portal enabled** — `/patient` is now a full dashboard (was a mobile-only handoff); all four web roles functional.
+- **Agora video** — backend token service + endpoints; web SDK + native `react-native-agora`; selectable via `VIDEO_PROVIDER`.
+- **Visit type + medical documents** — new/follow-up choice and base64 report/prescription uploads, surfaced to the doctor portal.
+- **Admin/Management data-flow fixes** — broadcast fan-out actually delivers; `daily_video_quota` persists; "block all slots" is enforced; settings filter-by-key.
 
-### Scaling (industry-grade, 1000+ concurrent users)
-The backend is stateless and horizontally scalable. See **[docs/scalability.md](docs/scalability.md)** for the full architecture. Highlights:
-- **Multi-core cluster mode**: `npm run start:cluster` (`Backend/src/cluster.js`) forks one worker per CPU core, all sharing port 5000. Verified locally with 16 workers.
-- **Production process manager**: `Backend/ecosystem.config.cjs` (PM2 cluster, zero-downtime reloads) → `npm run start:prod`.
-- **Load tester**: `npm run loadtest` (`CONCURRENCY=1000 npm run loadtest`). Verified **1000 concurrent users → 0 errors, ~4,400 req/s, p99 ≈ 340ms** on `/health`.
-- **Foundations**: JWT statelessness, Redis cache + Socket.IO Redis adapter (in-memory fallback in dev), Mongo connection pooling + compound/TTL indexes, per-IP rate limiting, keep-alive/header/request timeouts, graceful shutdown.
+## 14. Known issues / cleanup
+
+- **Migration shim:** the web frontend still uses the Supabase-compatible client (proxying the Express API) rather than calling domain routes directly.
+- **Duplicate frontend:** `Frontend/App/` (and nested `Frontend/App/APP/`) are unused copies — safe to delete.
+- **Legacy SQL:** `Database/*.sql` is the old Supabase schema, reference only.
+- **Stale docs:** some `docs/*.md` still describe Supabase; `mongodb.md` / `scalability.md` are current.
+- **`cnic`/`age`** are stored inside `users.medical_history` (not first-class columns) — works, but could be promoted to dedicated fields.
+- **Native Agora video** requires a custom Expo dev build; it does not run in Expo Go.
+
+### Scaling (1000+ concurrent users)
+Stateless, horizontally scalable. `npm run start:cluster` (multi-core) / PM2 `ecosystem.config.cjs`; Redis cache + Socket.IO Redis adapter (in-memory fallback in dev); Mongo pooling + compound/TTL indexes; per-IP rate limiting; graceful shutdown. Load-tested at ~1000 concurrent users on `/health`. See **[docs/scalability.md](docs/scalability.md)**.
 
 ### Before production
-- Real `DAILY_API_KEY` (video), Firebase Admin credentials (push).
-- Strong unique `JWT_SECRET` and `OTP_HASH_SECRET`.
-- HTTPS API domain; set `OTP_DEV_MODE=false`; `TRUST_PROXY=true` behind a load balancer.
-- Set `REDIS_URL` / `SOCKET_IO_REDIS_URL` for multi-instance cache + Socket.IO scaling (required once running >1 worker/instance).
-- Mobile: EAS project, `google-services.json` / `GoogleService-Info.plist`.
+Rotate all dev keys; strong unique `JWT_SECRET`/`OTP_HASH_SECRET`; `OTP_DEV_MODE=false`; HTTPS API domain + `TRUST_PROXY=true`; set `REDIS_URL`/`SOCKET_IO_REDIS_URL`; verify a real sending domain (or keep Gmail SMTP within its ~500/day limit); EAS build + Firebase config files for mobile push & native video.
 ```

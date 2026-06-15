@@ -17,7 +17,9 @@ const router = express.Router();
 router.get(
     '/',
     authMiddleware,
-    requireRole(['admin', 'management', 'doctor']),
+    // Patients are allowed through, but getAllPatients scopes the result to
+    // their own profile (the web patient portal loads it from this route).
+    requireRole(['admin', 'management', 'doctor', 'patient']),
     asyncHandler(getAllPatients)
 );
 

@@ -1,6 +1,6 @@
-// INDUS Hospital & Health Network brand tokens (red + navy).
+// INDUS Hospital & Health Network brand tokens (red + navy), light + dark.
 
-export const colors = {
+export const lightColors = {
   // Brand — INDUS red
   primary: '#BE1E2D',
   primaryDark: '#8E1620',
@@ -38,6 +38,46 @@ export const colors = {
   blue: '#1B365D',
   yellow: '#B45309',
 };
+
+export type ThemeColors = typeof lightColors;
+
+export const darkColors: ThemeColors = {
+  primary: '#F2616D',
+  primaryDark: '#BE1E2D',
+  primarySoft: '#3A1E22',
+  primaryTint: '#4A2630',
+
+  navy: '#3E5C8A',
+  navyDark: '#122643',
+  navySoft: '#1E2C44',
+  accent: '#3E5C8A',
+
+  ink: '#F1F5F9',
+  text: '#DCE5F0',
+  muted: '#9AA8BD',
+  subtle: '#6B7A92',
+  border: '#27344C',
+  divider: '#1E2940',
+  surface: '#141E30',
+  surfaceAlt: '#1C2840',
+  background: '#0B1220',
+
+  success: '#3FCB84',
+  successSoft: '#16291F',
+  warning: '#E5A046',
+  warningSoft: '#2A2113',
+  danger: '#F2616D',
+
+  red: '#F2616D',
+  redDark: '#BE1E2D',
+  green: '#3FCB84',
+  blue: '#3E5C8A',
+  yellow: '#E5A046',
+};
+
+// Default static export (light). Screens that consume `useTheme()` get the
+// active palette; anything still importing `colors` directly renders light.
+export const colors = lightColors;
 
 export const radius = { sm: 10, md: 14, lg: 18, xl: 24, pill: 999 };
 

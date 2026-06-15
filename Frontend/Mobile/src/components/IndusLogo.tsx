@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeContext';
 
 interface IndusLogoProps {
   /** Height of the H monogram in px. */
@@ -18,10 +19,11 @@ interface IndusLogoProps {
  * brand colours (no bitmap asset required).
  */
 export function IndusLogo({ size = 44, showText = true, onDark = false }: IndusLogoProps) {
+  const { colors: theme } = useTheme();
   const m = size;
   const postW = Math.round(m * 0.26);
   const crossH = Math.round(m * 0.24);
-  const textColor = onDark ? '#FFFFFF' : colors.navy;
+  const textColor = onDark ? '#FFFFFF' : theme.navy;
 
   return (
     <View style={styles.row}>

@@ -11,6 +11,12 @@ export interface VideoRoom {
   url: string;
   name: string;
   provider?: string;
+  // Present when provider === 'agora'
+  appId?: string;
+  channel?: string;
+  token?: string | null;
+  uid?: number;
+  expiresAt?: number;
 }
 
 export async function getOrCreateVideoRoom(appointmentId: string): Promise<VideoRoom> {
