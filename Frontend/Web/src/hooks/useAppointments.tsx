@@ -16,7 +16,9 @@ export interface CreateAppointmentInput {
   appointment_date: string;
   appointment_time: string;
   appointment_type: 'physical' | 'video';
+  visit_type?: 'new' | 'follow_up';
   chief_complaint?: string;
+  history_summary?: string;
   doctor_specialty?: string;
 }
 
@@ -159,6 +161,12 @@ export function useAppointments(patientId?: string, date?: string) {
         };
         if (input.chief_complaint?.trim()) {
           (insertData as any).chief_complaint = input.chief_complaint.trim();
+        }
+        if (input.visit_type) {
+          (insertData as any).visit_type = input.visit_type;
+        }
+        if (input.history_summary?.trim()) {
+          (insertData as any).history_summary = input.history_summary.trim();
         }
 
         const { data, error: insertErr } = await MongoDB

@@ -19,7 +19,7 @@ import { navigationRef } from '@/navigation/navigationRef';
 export type RootStackParamList = {
   Login: undefined;
   PatientTabs: NavigatorScreenParams<PatientTabParamList>;
-  BookAppointment: undefined;
+  BookAppointment: { doctorId?: string } | undefined;
   AppointmentDetails: { appointmentId: string };
   VideoCall: { appointmentId: string };
   DoctorHome: undefined;

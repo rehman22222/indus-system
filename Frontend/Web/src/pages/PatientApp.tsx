@@ -21,8 +21,9 @@ import {
   Calendar as CalendarIcon, Clock, User, FileText, History, Plus, Search,
   LogOut, Stethoscope, Video, MapPin, Phone, Mail, CheckCircle2, AlertCircle,
   Pill, Activity, Home, ArrowLeft, ArrowRight, Check, Eye, QrCode, Loader2,
-  ChevronRight
+  ChevronRight, GraduationCap, Star, Paperclip, X
 } from 'lucide-react';
+import { uploadPatientDocument, fileToBase64, type DocKind } from '@/lib/documents';
 import AppointmentQRCode from '@/components/patient/AppointmentQRCode';
 import { VideoCall } from '@/components/shared/VideoCall';
 import { getOrCreateVideoRoom, type VideoRoom } from '@/lib/videoRoom';
@@ -56,7 +57,13 @@ export default function PatientApp() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState('');
   const [appointmentType, setAppointmentType] = useState<'physical' | 'video'>('physical');
+  const [visitType, setVisitType] = useState<'new' | 'follow_up'>('new');
   const [chiefComplaint, setChiefComplaint] = useState('');
+  const [historySummary, setHistorySummary] = useState('');
+  const [attachments, setAttachments] = useState<{ file: File; kind: DocKind }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingKindRef = useRef<DocKind>('report');
+  const [doctorSearch, setDoctorSearch] = useState('');
 
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [qrAppointment, setQrAppointment] = useState<Appointment | null>(null);
@@ -164,6 +171,28 @@ export default function PatientApp() {
     }
   };
 
+  const pickAttachment = (kind: DocKind) => {
+    pendingKindRef.current = kind;
+    fileInputRef.current?.click();
+  };
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (attachments.length >= 5) {
+      toast({ title: 'Limit reached', description: 'You can attach up to 5 files.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Each file must be under 6 MB.', variant: 'destructive' });
+      return;
+    }
+    setAttachments((prev) => [...prev, { file, kind: pendingKindRef.current }]);
+  };
+
+  const removeAttachment = (index: number) => setAttachments((prev) => prev.filter((_, i) => i !== index));
+
   const handleBookAppointment = async () => {
     if (!patient) {
       toast({ title: 'Error', description: 'Patient profile not found.', variant: 'destructive' });
@@ -207,7 +236,9 @@ export default function PatientApp() {
       appointment_date: dateStr,
       appointment_time: selectedTime,
       appointment_type: appointmentType,
+      visit_type: visitType,
       chief_complaint: chiefComplaint || undefined,
+      history_summary: historySummary || undefined,
       doctor_specialty: doc?.specialty || 'General Medicine',
     });
 
@@ -218,6 +249,33 @@ export default function PatientApp() {
         variant: 'destructive'
       });
       return;
+    }
+
+    // Upload attached reports / past prescriptions, linked to the new appointment
+    // so the doctor portal shows them live. Failures don't void the booking.
+    const newAptId = (data as any).id || (data as any)._id;
+    if (newAptId && attachments.length) {
+      let failures = 0;
+      for (const att of attachments) {
+        try {
+          const base64 = await fileToBase64(att.file);
+          await uploadPatientDocument({
+            patientId: patient.id,
+            appointmentId: String(newAptId),
+            kind: att.kind,
+            title: att.kind === 'prescription' ? 'Past prescription' : 'Medical report',
+            originalName: att.file.name,
+            mime: att.file.type || 'application/octet-stream',
+            dataBase64: base64,
+            size: att.file.size,
+          });
+        } catch {
+          failures += 1;
+        }
+      }
+      if (failures) {
+        toast({ title: 'Some files were not uploaded', description: `${failures} file(s) failed — you can attach them later.`, variant: 'destructive' });
+      }
     }
 
     showSuccess(data.token);
@@ -495,35 +553,84 @@ export default function PatientApp() {
                 ))}
               </div>
 
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                {doctorsLoading ? (
-                  <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>
-                ) : doctors.length === 0 ? (
-                  <div className="p-8 text-center"><p className="text-muted-foreground text-sm">No doctors available</p></div>
-                ) : (
-                  doctors.map((doc) => (
-                    <Card key={doc.id} onClick={() => setSelectedDoctor(doc.id)}
-                      className={cn("p-3 md:p-4 rounded-xl cursor-pointer transition-all active:scale-[0.98]",
-                        selectedDoctor === doc.id ? "border-primary bg-primary/5" : "hover:border-primary/30")}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                          <Stethoscope className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{doc.name}</p>
-                          <p className="text-xs text-muted-foreground">{doc.specialty}</p>
-                          {doc.department && <Badge variant="outline" className="text-[10px] mt-1">{doc.department.name}</Badge>}
-                        </div>
-                        {selectedDoctor === doc.id && <Check className="h-5 w-5 text-primary shrink-0" />}
-                      </div>
-                    </Card>
-                  ))
-                )}
+              {/* Search */}
+              <div className="relative w-full max-w-md mx-auto">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search by name or specialty..." value={doctorSearch}
+                  onChange={(e) => setDoctorSearch(e.target.value)} className="pl-9 rounded-xl h-10" />
               </div>
 
-              <Button className="w-full rounded-xl h-11" disabled={!selectedDoctor} onClick={() => setBookingStep('datetime')}>
-                Continue <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[58vh] overflow-y-auto pr-1">
+                {doctorsLoading ? (
+                  <div className="col-span-full p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>
+                ) : (() => {
+                  const q = doctorSearch.trim().toLowerCase();
+                  const list = q
+                    ? doctors.filter((d) => (d.name || '').toLowerCase().includes(q)
+                        || (d.specialty || '').toLowerCase().includes(q)
+                        || ((d as any).department?.name || '').toLowerCase().includes(q))
+                    : doctors;
+                  if (list.length === 0) {
+                    return <div className="col-span-full p-8 text-center"><p className="text-muted-foreground text-sm">No doctors found</p></div>;
+                  }
+                  return list.map((doc) => {
+                    const d = doc as any;
+                    const selected = selectedDoctor === doc.id;
+                    const inits = (doc.name || 'Dr').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+                    const photo = d.image_url || d.avatar_url || d.photo_url || d.profile_image;
+                    const expText = d.experience_years != null ? `${d.experience_years} yrs experience` : null;
+                    const metaLine = [expText, d.qualification].filter(Boolean).join('  |  ');
+                    const bookNow = () => { setSelectedDoctor(doc.id); setBookingStep('datetime'); };
+                    return (
+                      <Card key={doc.id}
+                        className={cn("p-4 rounded-2xl transition-all hover:shadow-md",
+                          selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/30")}>
+                        <div className="flex items-start gap-3">
+                          {/* Avatar / photo */}
+                          {photo ? (
+                            <img src={photo} alt={doc.name} className="h-16 w-16 rounded-2xl object-cover shrink-0" />
+                          ) : (
+                            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-base">{inits}</div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <p className="font-bold text-sm truncate">{doc.name}</p>
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-chart-2 shrink-0" />
+                                </div>
+                                <p className="text-xs text-primary font-medium truncate">{doc.specialty}</p>
+                              </div>
+                              {typeof d.rating === 'number' && d.rating > 0 && (
+                                <Badge variant="outline" className="shrink-0 gap-0.5 border-emerald-300 bg-emerald-50 text-[10px] text-emerald-700">
+                                  <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" /> {d.rating.toFixed(1)}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
+                              {metaLine ? (<><GraduationCap className="h-3 w-3 shrink-0" /> {metaLine}</>) : 'Profile details coming soon'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Fee + Book Now */}
+                        <div className="mt-3 flex items-end justify-between gap-2 border-t pt-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Consultation fee</p>
+                            <p className="text-sm font-bold">
+                              {d.consultation_fee != null ? `Rs. ${d.consultation_fee}` : <span className="text-emerald-600">Free</span>}
+                            </p>
+                          </div>
+                          <Button size="sm" className="rounded-xl px-5" onClick={bookNow}>
+                            Book Now <ArrowRight className="ml-1 h-4 w-4" />
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  });
+                })()}
+              </div>
+              <p className="text-center text-xs text-muted-foreground">Tap <span className="font-medium text-foreground">Book Now</span> on a doctor to choose a date &amp; time.</p>
             </div>
           )}
 
@@ -556,11 +663,63 @@ export default function PatientApp() {
                   </div>
                 </div>
               )}
+              {/* Visit type */}
+              <div className="space-y-2">
+                <Label className="text-sm">Visit type</Label>
+                <div className="flex bg-secondary/50 rounded-xl p-1">
+                  {(['new', 'follow_up'] as const).map((type) => (
+                    <button key={type} type="button" onClick={() => setVisitType(type)}
+                      className={cn("flex-1 py-2 px-3 rounded-lg text-xs md:text-sm font-medium transition-all",
+                        visitType === type ? "bg-card shadow" : "text-muted-foreground")}>
+                      {type === 'new' ? 'New / Initial' : 'Follow-up'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-sm">Chief Complaint (Optional)</Label>
                 <Input placeholder="Describe your symptoms..." value={chiefComplaint}
                   onChange={(e) => setChiefComplaint(e.target.value)} className="rounded-xl" />
               </div>
+
+              {/* Relevant medical history */}
+              <div className="space-y-2">
+                <Label className="text-sm">Relevant medical history (Optional)</Label>
+                <textarea
+                  value={historySummary}
+                  onChange={(e) => setHistorySummary(e.target.value)}
+                  placeholder="Previous diagnoses, treatments, medicines, allergies, or procedures"
+                  rows={3}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+
+              {/* Reports & past prescriptions */}
+              <div className="space-y-2">
+                <Label className="text-sm">Reports & past prescriptions (Optional)</Label>
+                <p className="-mt-1 text-xs text-muted-foreground">Attach up to 5 files (PDF or image, under 6 MB each). The doctor sees them during your consultation.</p>
+                <input ref={fileInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onFileSelected} />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button type="button" variant="outline" className="flex-1 rounded-xl border-dashed" onClick={() => pickAttachment('report')}>
+                    <FileText className="h-4 w-4 mr-1.5" /> Add report
+                  </Button>
+                  <Button type="button" variant="outline" className="flex-1 rounded-xl border-dashed" onClick={() => pickAttachment('prescription')}>
+                    <Pill className="h-4 w-4 mr-1.5" /> Add prescription
+                  </Button>
+                </div>
+                {attachments.map((att, i) => (
+                  <div key={`${att.file.name}-${i}`} className="flex items-center gap-2 rounded-xl bg-secondary/50 px-3 py-2">
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="shrink-0 text-[10px] font-bold uppercase text-primary">{att.kind === 'prescription' ? 'Rx' : 'Report'}</span>
+                    <span className="flex-1 truncate text-xs">{att.file.name}</span>
+                    <button type="button" onClick={() => removeAttachment(i)} className="shrink-0 text-muted-foreground hover:text-destructive">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
               <Button className="w-full rounded-xl h-11" disabled={!selectedDate || !selectedTime} onClick={() => setBookingStep('confirm')}>
                 Continue <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -587,6 +746,7 @@ export default function PatientApp() {
                   { icon: CalendarIcon, text: selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy') },
                   { icon: Clock, text: selectedTime },
                   { icon: appointmentType === 'video' ? Video : MapPin, text: appointmentType === 'video' ? 'Video Consultation' : 'In-Person Visit' },
+                  { icon: User, text: visitType === 'follow_up' ? 'Follow-up visit' : 'New / Initial visit' },
                 ].map(({ icon: Icon, text }, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <Icon className="h-4 w-4 text-muted-foreground" /><span>{text}</span>
@@ -595,6 +755,17 @@ export default function PatientApp() {
                 {chiefComplaint && (
                   <div className="flex items-start gap-2 text-sm">
                     <FileText className="h-4 w-4 text-muted-foreground mt-0.5" /><span>{chiefComplaint}</span>
+                  </div>
+                )}
+                {historySummary && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <History className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-muted-foreground">{historySummary}</span>
+                  </div>
+                )}
+                {attachments.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    <span>{attachments.length} file{attachments.length > 1 ? 's' : ''} attached</span>
                   </div>
                 )}
               </Card>
@@ -874,6 +1045,9 @@ export default function PatientApp() {
                     setSelectedDate(undefined);
                     setSelectedTime('');
                     setChiefComplaint('');
+                    setVisitType('new');
+                    setHistorySummary('');
+                    setAttachments([]);
                     // Go to appointments tab
                     setActiveTab('appointments');
                   }}

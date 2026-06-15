@@ -164,7 +164,7 @@ export function DoctorsTabScreen({ navigation }: Props) {
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.bookBtn, pressed && styles.bookBtnPressed]}
-                  onPress={() => navigation.dispatch(navigationAction('BookAppointment'))}
+                  onPress={() => navigation.dispatch(navigationAction('BookAppointment', { doctorId: item.id }))}
                 >
                   <Ionicons name="calendar" size={15} color="#fff" />
                   <Text style={styles.bookText}>{t('doctors.book')}</Text>

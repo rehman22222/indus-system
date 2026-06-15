@@ -44,6 +44,7 @@ export const translations: Record<Lang, Dict> = {
     'call.cancel': 'Cancel',
     'call.connecting': 'Connecting…',
     'call.waitingDoctor': 'Waiting for the doctor to join…',
+    'call.you': 'You',
     'call.failed': 'Call failed',
     'call.permError': 'Camera and microphone permission is required for the call.',
     'call.notAgora': 'This call is not configured for Agora video.',
@@ -61,6 +62,8 @@ export const translations: Record<Lang, Dict> = {
     // Booking
     'book.department': 'Department',
     'book.doctor': 'Doctor',
+    'book.bookingWith': 'Booking with',
+    'book.change': 'Change',
     'book.date': 'Date',
     'book.consultType': 'Consultation type',
     'book.availableSlot': 'Available slot',
@@ -241,6 +244,7 @@ export const translations: Record<Lang, Dict> = {
     'call.cancel': 'منسوخ کریں',
     'call.connecting': 'جوڑا جا رہا ہے…',
     'call.waitingDoctor': 'ڈاکٹر کے شامل ہونے کا انتظار…',
+    'call.you': 'آپ',
     'call.failed': 'کال ناکام',
     'call.permError': 'کال کے لیے کیمرہ اور مائیک کی اجازت ضروری ہے۔',
     'call.notAgora': 'یہ کال ایگورا ویڈیو کے لیے کنفیگر نہیں۔',
@@ -258,6 +262,8 @@ export const translations: Record<Lang, Dict> = {
     // Booking
     'book.department': 'شعبہ',
     'book.doctor': 'ڈاکٹر',
+    'book.bookingWith': 'بکنگ برائے',
+    'book.change': 'تبدیل کریں',
     'book.date': 'تاریخ',
     'book.consultType': 'مشاورت کی قسم',
     'book.availableSlot': 'دستیاب وقت',

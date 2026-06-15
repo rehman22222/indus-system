@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -57,17 +58,21 @@ function parseDateIso(value: string) {
   return new Date(year, month - 1, day, 12, 0, 0);
 }
 
-export function BookAppointmentScreen({ navigation }: Props) {
+export function BookAppointmentScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const { t, isRtl } = useI18n();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const align = { textAlign: isRtl ? 'right' : 'left' } as const;
+  // When the patient taps "Book Appointment" on a specific doctor (Doctors tab),
+  // that doctor is pre-selected and locked — the flow skips straight to date/slot.
+  const preselectedDoctorId = route.params?.doctorId;
   const [departments, setDepartments] = useState<Department[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [department, setDepartment] = useState<Department | null>(null);
   const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [doctorLocked, setDoctorLocked] = useState<boolean>(Boolean(preselectedDoctorId));
   const [slot, setSlot] = useState<Slot | null>(null);
   const [date, setDate] = useState(todayIso());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -152,6 +157,25 @@ export function BookAppointmentScreen({ navigation }: Props) {
   useEffect(() => {
     loadDepartments();
   }, [loadDepartments]);
+
+  // Pre-select the doctor passed from the Doctors tab and jump to date/slot.
+  useEffect(() => {
+    if (!preselectedDoctorId) return;
+    let cancelled = false;
+    getDoctors()
+      .then((all) => {
+        if (cancelled) return;
+        const found = all.find((d) => d.id === preselectedDoctorId);
+        if (found) {
+          setDoctor(found);
+          setDoctorLocked(true);
+        } else {
+          setDoctorLocked(false); // fall back to the normal picker if not found
+        }
+      })
+      .catch(() => setDoctorLocked(false));
+    return () => { cancelled = true; };
+  }, [preselectedDoctorId]);
 
   useEffect(() => {
     if (!department) return;
@@ -245,54 +269,107 @@ export function BookAppointmentScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {/* Department */}
-      <Text style={[styles.label, align]}>{t('book.department')}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        {departments.map((item) => {
-          const active = department?.id === item.id;
-          return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.root}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
+      showsVerticalScrollIndicator={false}
+    >
+      {doctorLocked && doctor ? (
+        /* Pre-selected doctor (tapped "Book Appointment" on the Doctors tab) */
+        <View style={styles.confirmCard}>
+          <View style={styles.confirmTop}>
+            <View style={styles.confirmAvatar}>
+              <Text style={styles.confirmAvatarText}>{initials(doctor.name || doctor.full_name)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.confirmLabel}>{t('book.bookingWith')}</Text>
+              <Text style={[styles.confirmName, align]} numberOfLines={1}>{doctor.name || doctor.full_name}</Text>
+              <Text style={[styles.confirmSpecialty, align]} numberOfLines={1}>{doctor.specialty}</Text>
+            </View>
             <Pressable
-              key={item.id}
-              onPress={() => setDepartment(item)}
-              style={[styles.chip, active && styles.chipActive]}
+              hitSlop={8}
+              onPress={() => { setDoctorLocked(false); setDoctor(null); setDepartment(null); setSlot(null); }}
+              style={styles.changeBtn}
             >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.name}</Text>
+              <Text style={styles.changeText}>{t('book.change')}</Text>
             </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Doctor */}
-      {department && (
+          </View>
+          <View style={styles.confirmStats}>
+            {doctor.experience_years !== undefined && (
+              <View style={styles.confirmStat}>
+                <Ionicons name="ribbon-outline" size={15} color={colors.navy} />
+                <Text style={styles.confirmStatText}>{doctor.experience_years} {t('doctors.years')}</Text>
+              </View>
+            )}
+            {doctor.consultation_fee !== undefined && (
+              <View style={styles.confirmStat}>
+                <Ionicons name="cash-outline" size={15} color={colors.navy} />
+                <Text style={styles.confirmStatText}>Rs. {doctor.consultation_fee}</Text>
+              </View>
+            )}
+            {!!doctor.qualification && (
+              <View style={[styles.confirmStat, { flex: 1 }]}>
+                <Ionicons name="school-outline" size={15} color={colors.navy} />
+                <Text style={styles.confirmStatText} numberOfLines={1}>{doctor.qualification}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : (
         <>
-          <Text style={[styles.label, align]}>{t('book.doctor')}</Text>
-          {doctors.length === 0 ? (
-            <Text style={styles.empty}>{t('book.noDoctors')}</Text>
-          ) : (
-            doctors.map((item) => {
-              const active = doctor?.id === item.id;
+          {/* Department */}
+          <Text style={[styles.label, align]}>{t('book.department')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {departments.map((item) => {
+              const active = department?.id === item.id;
               return (
                 <Pressable
                   key={item.id}
-                  onPress={() => setDoctor(item)}
-                  style={[styles.docCard, active && styles.selected]}
+                  onPress={() => setDepartment(item)}
+                  style={[styles.chip, active && styles.chipActive]}
                 >
-                  <View style={[styles.docAvatar, active && styles.docAvatarActive]}>
-                    <Text style={[styles.docAvatarText, active && { color: colors.primary }]}>
-                      {initials(item.name || item.full_name)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.docName}>{item.name || item.full_name}</Text>
-                    <Text style={styles.muted}>{item.specialty}</Text>
-                  </View>
-                  <View style={[styles.radio, active && styles.radioActive]}>
-                    {active && <View style={styles.radioDot} />}
-                  </View>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.name}</Text>
                 </Pressable>
               );
-            })
+            })}
+          </ScrollView>
+
+          {/* Doctor */}
+          {department && (
+            <>
+              <Text style={[styles.label, align]}>{t('book.doctor')}</Text>
+              {doctors.length === 0 ? (
+                <Text style={styles.empty}>{t('book.noDoctors')}</Text>
+              ) : (
+                doctors.map((item) => {
+                  const active = doctor?.id === item.id;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => setDoctor(item)}
+                      style={[styles.docCard, active && styles.selected]}
+                    >
+                      <View style={[styles.docAvatar, active && styles.docAvatarActive]}>
+                        <Text style={[styles.docAvatarText, active && { color: colors.primary }]}>
+                          {initials(item.name || item.full_name)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.docName}>{item.name || item.full_name}</Text>
+                        <Text style={styles.muted}>{item.specialty}</Text>
+                      </View>
+                      <View style={[styles.radio, active && styles.radioActive]}>
+                        {active && <View style={styles.radioDot} />}
+                      </View>
+                    </Pressable>
+                  );
+                })
+              )}
+            </>
           )}
         </>
       )}
@@ -454,6 +531,7 @@ export function BookAppointmentScreen({ navigation }: Props) {
         {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{t('book.confirm')}</Text>}
       </Pressable>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -497,6 +575,41 @@ const makeStyles = (colors: ThemeColors) =>
     ...shadow.soft,
   },
   selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+
+  confirmCard: {
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    padding: spacing.md,
+    ...shadow.soft,
+  },
+  confirmTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  confirmAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  confirmAvatarText: { color: colors.primary, fontWeight: '800', fontSize: 18 },
+  confirmLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
+  confirmName: { color: colors.ink, fontWeight: '800', fontSize: 17, marginTop: 1 },
+  confirmSpecialty: { color: colors.primary, fontWeight: '700', fontSize: 13, marginTop: 1 },
+  changeBtn: { borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  changeText: { color: colors.navy, fontWeight: '800', fontSize: 12 },
+  confirmStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  confirmStat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  confirmStatText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   docAvatar: {
     width: 46,
     height: 46,

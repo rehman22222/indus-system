@@ -63,6 +63,9 @@ const config: ExpoConfig = {
   android: {
     package: 'com.indushospital.appointment',
     googleServicesFile: androidGoogleServicesFile,
+    // Resize the window when the keyboard opens so scroll views can reveal the
+    // focused field instead of the keyboard covering it.
+    softwareKeyboardLayoutMode: 'resize',
     permissions: [
       'CAMERA',
       'RECORD_AUDIO',

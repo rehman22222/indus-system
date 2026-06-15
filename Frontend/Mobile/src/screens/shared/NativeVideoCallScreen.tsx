@@ -10,6 +10,7 @@ import {
   type IRtcEngine,
   type IRtcEngineEventHandler,
   RtcSurfaceView,
+  RtcTextureView,
 } from 'react-native-agora';
 
 import { createVideoRoom } from '@/services/video';
@@ -175,10 +176,13 @@ export function NativeVideoCallScreen({ route, navigation }: Props) {
         </View>
       )}
 
-      {/* Local preview (PiP) */}
+      {/* Local preview (PiP). A TextureView composites correctly on top of the
+          remote SurfaceView — a plain SurfaceView overlay renders blank on many
+          Android devices, which is why the self-view box was empty. */}
       {phase !== 'error' && camOn && (
         <View style={[styles.pip, { top: insets.top + 12 }]}>
-          <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} zOrderMediaOverlay />
+          <RtcTextureView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+          <Text style={styles.pipLabel}>{t('call.you')}</Text>
         </View>
       )}
 
@@ -213,6 +217,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
+  },
+  pipLabel: {
+    position: 'absolute',
+    left: 6,
+    bottom: 5,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
+    overflow: 'hidden',
   },
   controls: {
     position: 'absolute',
