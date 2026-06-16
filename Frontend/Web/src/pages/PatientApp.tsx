@@ -374,15 +374,21 @@ export default function PatientApp() {
             </Button>
           </div>
 
-          {/* Stats */}
+          {/* Stats — click to open the related list */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: Clock, label: 'Upcoming', value: appointments.filter(a => ['confirmed', 'waiting'].includes(a.status)).length, color: 'text-primary', bg: 'bg-primary/10' },
-              { icon: CheckCircle2, label: 'Completed', value: appointments.filter(a => a.status === 'completed').length, color: 'text-chart-2', bg: 'bg-chart-2/10' },
-              { icon: FileText, label: 'Prescriptions', value: prescriptions.length, color: 'text-chart-3', bg: 'bg-chart-3/10' },
-              { icon: Stethoscope, label: 'Doctors', value: doctors.length, color: 'text-chart-4', bg: 'bg-chart-4/10' },
-            ].map(({ icon: Icon, label, value, color, bg }) => (
-              <Card key={label} className="p-3 md:p-4 rounded-xl">
+              { icon: Clock, label: 'Upcoming', value: appointments.filter(a => ['confirmed', 'waiting'].includes(a.status)).length, color: 'text-primary', bg: 'bg-primary/10', tab: 'appointments' as DashboardTab },
+              { icon: CheckCircle2, label: 'Completed', value: appointments.filter(a => a.status === 'completed').length, color: 'text-chart-2', bg: 'bg-chart-2/10', tab: 'appointments' as DashboardTab },
+              { icon: FileText, label: 'Prescriptions', value: prescriptions.length, color: 'text-chart-3', bg: 'bg-chart-3/10', tab: 'history' as DashboardTab },
+              { icon: Stethoscope, label: 'Doctors', value: doctors.length, color: 'text-chart-4', bg: 'bg-chart-4/10', tab: 'book' as DashboardTab },
+            ].map(({ icon: Icon, label, value, color, bg, tab }) => (
+              <Card
+                key={label}
+                role="button"
+                tabIndex={0}
+                onClick={() => { setActiveTab(tab); if (tab === 'appointments') setFilterStatus(label === 'Completed' ? 'completed' : 'all'); }}
+                className="p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:shadow-md hover:border-primary/40 active:scale-[0.98]"
+              >
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className={cn("h-9 w-9 md:h-10 md:w-10 rounded-lg flex items-center justify-center", bg)}>
                     <Icon className={cn("h-4 w-4 md:h-5 md:w-5", color)} />

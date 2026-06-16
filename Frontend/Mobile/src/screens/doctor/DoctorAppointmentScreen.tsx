@@ -24,7 +24,6 @@ import { listDocuments, openDocument, type MedicalDocument } from '@/api/documen
 import type { Appointment, Doctor, Medication, Prescription } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { openVideoConsultation } from '@/services/video';
 import { initials, radius, shadow, spacing } from '@/theme/colors';
 import { useTheme, type ThemeColors } from '@/theme/ThemeContext';
 
@@ -169,13 +168,12 @@ export function DoctorAppointmentScreen({ route, navigation }: Props) {
     changeStatus('in_consultation');
   }
 
-  async function launchVideo() {
+  function launchVideo() {
     if (!appointment) return;
-    try {
-      await openVideoConsultation(appointment.id);
-    } catch (error) {
-      Alert.alert('Could not open video consultation', error instanceof Error ? error.message : 'Please try again.');
-    }
+    // Join the native Agora call (this also rings the patient). The old flow
+    // opened the web room URL, which on a deployed backend points at the
+    // configured web base (localhost by default) and fails on the phone.
+    navigation.navigate('VideoCall', { appointmentId: appointment.id });
   }
 
   function updateMedication(index: number, field: keyof Medication, value: string) {

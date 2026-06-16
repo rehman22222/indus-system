@@ -69,7 +69,7 @@ analytics layer (no‑show prediction, demand forecasting, explainability).
 - `src/routes/*` — Express routers (one per domain).
 - `src/controllers/*` — request handlers / business logic.
 - `src/models/index.js` — all Mongoose schemas (see §4).
-- `src/services/*` — cross-cutting services (realtime, cache, email, push, OTP, Agora, notification queue, reminder scheduler, password).
+- `src/services/*` — cross-cutting services (realtime, cache, email, push, OTP, Agora, notification queue, reminder scheduler, **self-ping keep-alive**, password).
 - `src/middleware/*` — `auth.js` (JWT verify + `requireRole`), `errorHandler.js`, `validator.js`, `rateLimitStore.js`.
 - `src/config/*` — `env.js` (validated env), `mongodb.js` (connection).
 - `src/utils/*` — `api.js` (list/paging/projection), `mongo.js` (serialize / ObjectId).
@@ -204,7 +204,7 @@ Three delivery channels, decoupled from the request path:
 - Fires **2 h before**, **30 min before**, and **at start time** → in-app + FCM push to the patient.
 - **Exactly-once** via an atomic `reminders_sent` claim (safe across multiple instances).
 - **Timezone-safe** via `CLINIC_UTC_OFFSET_MINUTES` (default 300 = PKT), so naive `date`/`time` strings fire correctly whether the server clock is PKT (dev) or UTC (Render).
-- ⚠️ A sleeping free Render instance pauses the scheduler — keep it warm (uptime pinger on `/health`) for reliable reminders.
+- **Keep-alive (self-ping):** `src/services/selfPing.service.js`. In production the server pings its **own** public URL (`SELF_PING_URL` / Render's `RENDER_EXTERNAL_URL`) every `SELF_PING_MINUTES` (default 12, just under Render free's ~15-min idle window). This is inbound traffic to the public endpoint, so the free instance never sleeps and the reminder scheduler keeps ticking — no external pinger or always-on PC required.
 
 ---
 
@@ -230,7 +230,7 @@ All of this rides the single Atlas DB, so web and mobile stay in sync regardless
 
 | Concern | Where | Notes |
 |---|---|---|
-| Backend API | **Render** Web Service (Node, free tier) | `https://indus-system.onrender.com`, port 10000; cold-starts after idle |
+| Backend API | **Render** Web Service (Node, free tier) | `https://indus-system.onrender.com`, port 10000; kept awake by the built-in **self-ping** (no idle sleep) |
 | Database | **MongoDB Atlas** | shared by all environments; IP allowlist |
 | Realtime bus | **Upstash Redis** (`rediss://`) | `SOCKET_IO_REDIS_URL` on both local + Render to bridge realtime |
 | Email | **Brevo** (HTTPS API) | `EMAIL_PROVIDER=brevo` on Render (SMTP is blocked there) |
@@ -255,6 +255,7 @@ DOCTOR_CALL_WEB_BASE_URL, PATIENT_CALL_WEB_BASE_URL
 REDIS_URL, SOCKET_IO_REDIS_URL                               # cache + socket bus (Upstash)
 FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY            # or FIREBASE_SERVICE_ACCOUNT=file
 REMINDER_SCHEDULER_ENABLED, REMINDER_CHECK_INTERVAL_SECONDS, CLINIC_UTC_OFFSET_MINUTES
+SELF_PING_ENABLED, SELF_PING_MINUTES, SELF_PING_URL          # keep Render awake (defaults to RENDER_EXTERNAL_URL)
 ANALYTICS_API_URL
 ```
 Frontend: `Frontend/Web/.env` (`VITE_API_BASE_URL`), `Frontend/Mobile/.env` + `eas.json` (`EXPO_PUBLIC_API_BASE_URL`).

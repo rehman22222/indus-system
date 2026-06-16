@@ -59,10 +59,10 @@ export function HomeTabScreen({ navigation }: Props) {
   const completed = appointments.filter((a) => a.status === 'completed');
 
   const stats = [
-    { icon: 'time-outline' as const, label: t('stat.upcoming'), value: upcoming.length, tint: colors.primarySoft, color: colors.primary },
-    { icon: 'checkmark-circle-outline' as const, label: t('stat.completed'), value: completed.length, tint: colors.successSoft, color: colors.success },
-    { icon: 'document-text-outline' as const, label: t('stat.prescriptions'), value: rxCount, tint: colors.navySoft, color: colors.navy },
-    { icon: 'medkit-outline' as const, label: t('stat.doctors'), value: docCount, tint: '#FFF1E6', color: '#C2410C' },
+    { icon: 'time-outline' as const, label: t('stat.upcoming'), value: upcoming.length, tint: colors.primarySoft, color: colors.primary, target: 'Appointments' as const },
+    { icon: 'checkmark-circle-outline' as const, label: t('stat.completed'), value: completed.length, tint: colors.successSoft, color: colors.success, target: 'Appointments' as const },
+    { icon: 'document-text-outline' as const, label: t('stat.prescriptions'), value: rxCount, tint: colors.navySoft, color: colors.navy, target: 'History' as const },
+    { icon: 'medkit-outline' as const, label: t('stat.doctors'), value: docCount, tint: '#FFF1E6', color: '#C2410C', target: 'Doctors' as const },
   ];
 
   if (loading) {
@@ -95,18 +95,23 @@ export function HomeTabScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      {/* Stats */}
+      {/* Stats — tap to open the related list */}
       <View style={styles.statGrid}>
         {stats.map((s) => (
-          <View key={s.label} style={styles.statCard}>
+          <Pressable
+            key={s.label}
+            style={({ pressed }) => [styles.statCard, pressed && styles.statCardPressed]}
+            onPress={() => navigation.dispatch(navigationAction(s.target))}
+          >
             <View style={[styles.statIcon, { backgroundColor: s.tint }]}>
               <Ionicons name={s.icon} size={18} color={s.color} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.statLabel}>{s.label}</Text>
               <Text style={styles.statValue}>{s.value}</Text>
             </View>
-          </View>
+            <Ionicons name={isRtl ? 'chevron-back' : 'chevron-forward'} size={15} color={colors.subtle} />
+          </Pressable>
         ))}
       </View>
 
@@ -170,6 +175,7 @@ const makeStyles = (colors: ThemeColors) =>
 
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   statCard: { width: '47.5%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow.soft },
+  statCardPressed: { backgroundColor: colors.surfaceAlt, transform: [{ scale: 0.98 }] },
   statIcon: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   statLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   statValue: { color: colors.ink, fontSize: 18, fontWeight: '800' },
