@@ -11,7 +11,11 @@ name: Keep Render backend warm
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # Every 5 min. GitHub cron is best-effort (can be delayed several minutes
+    # under load), so we ping more often than the 15-min sleep window. The
+    # backend's own self-ping (selfPing.service.js) is the primary keep-alive;
+    # this is a backup layer.
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 jobs:

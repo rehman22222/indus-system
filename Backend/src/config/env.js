@@ -104,6 +104,15 @@ export const env = Object.freeze({
     REMINDER_SCHEDULER_ENABLED: bool('REMINDER_SCHEDULER_ENABLED', true),
     REMINDER_CHECK_INTERVAL_SECONDS: number('REMINDER_CHECK_INTERVAL_SECONDS', 60, { min: 15, max: 3600 }),
     CLINIC_UTC_OFFSET_MINUTES: number('CLINIC_UTC_OFFSET_MINUTES', 300, { min: -720, max: 840 }),
+
+    // Self-ping keep-alive: in production the server pings its own public URL on
+    // an interval shorter than the host's idle-sleep window (Render free = ~15
+    // min). This is inbound traffic to the public endpoint, so the instance never
+    // goes idle — no external pinger or always-on PC required. Defaults to the
+    // Render-provided RENDER_EXTERNAL_URL.
+    SELF_PING_ENABLED: bool('SELF_PING_ENABLED', isProduction),
+    SELF_PING_MINUTES: number('SELF_PING_MINUTES', 12, { min: 1, max: 14 }),
+    SELF_PING_URL: optional('SELF_PING_URL', optional('RENDER_EXTERNAL_URL', '')),
     CACHE_DEFAULT_TTL_SECONDS: number('CACHE_DEFAULT_TTL_SECONDS', 60, { min: 1, max: 86400 }),
 
     // Horizontal/vertical scaling and process management.

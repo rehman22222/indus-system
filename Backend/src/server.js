@@ -21,6 +21,7 @@ import {
     stopReminderScheduler,
     reminderSchedulerStatus,
 } from './services/reminderScheduler.service.js';
+import { startSelfPing, stopSelfPing, selfPingStatus } from './services/selfPing.service.js';
 import { HybridRateLimitStore } from './middleware/rateLimitStore.js';
 
 // Import routes
@@ -120,6 +121,7 @@ app.get('/health', (req, res) => {
     const realtime = realtimeStatus();
     const notifications = notificationQueueStatus();
     const reminders = reminderSchedulerStatus();
+    const selfPing = selfPingStatus();
 
     res.status(200).json({
         status: database.readyState === 1 ? 'healthy' : 'degraded',
@@ -132,6 +134,7 @@ app.get('/health', (req, res) => {
         realtime,
         notifications,
         reminders,
+        selfPing,
         redis: {
             cache: cache.redisReady,
             socketAdapter: realtime.redisAdapterReady,
@@ -206,6 +209,7 @@ async function startServer() {
     await initRealtime(server);
     await startNotificationWorker();
     startReminderScheduler();
+    startSelfPing();
 }
 
 let shuttingDown = false;
@@ -226,6 +230,7 @@ async function shutdown(signal) {
         if (server) {
             await new Promise((resolve) => server.close(resolve));
         }
+        stopSelfPing();
         stopReminderScheduler();
         await stopNotificationWorker();
         await disconnectCache();
