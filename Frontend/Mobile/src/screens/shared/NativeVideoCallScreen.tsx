@@ -11,6 +11,7 @@ import {
   type IRtcEngineEventHandler,
   RtcSurfaceView,
   RtcTextureView,
+  VideoSourceType,
 } from 'react-native-agora';
 
 import { createVideoRoom } from '@/services/video';
@@ -84,7 +85,12 @@ export function NativeVideoCallScreen({ route, navigation }: Props) {
         engine.initialize({ appId: room.appId });
 
         const handler: IRtcEngineEventHandler = {
-          onJoinChannelSuccess: () => !cancelled && setPhase((p) => (p === 'connected' ? p : 'waiting')),
+          onJoinChannelSuccess: () => {
+            if (cancelled) return;
+            engineRef.current?.enableLocalVideo(true);
+            engineRef.current?.muteLocalVideoStream(false);
+            setPhase((p) => (p === 'connected' ? p : 'waiting'));
+          },
           onUserJoined: (_conn, uid) => {
             if (cancelled) return;
             setRemoteUid(uid);
@@ -114,6 +120,7 @@ export function NativeVideoCallScreen({ route, navigation }: Props) {
         engine.registerEventHandler(handler);
 
         engine.enableVideo();
+        engine.enableLocalVideo(true);
         engine.startPreview();
         engine.joinChannel(room.token || '', room.channel, room.uid ?? 0, {
           channelProfile: ChannelProfileType.ChannelProfileCommunication,
@@ -176,12 +183,15 @@ export function NativeVideoCallScreen({ route, navigation }: Props) {
         </View>
       )}
 
-      {/* Local preview (PiP). A TextureView composites correctly on top of the
-          remote SurfaceView — a plain SurfaceView overlay renders blank on many
-          Android devices, which is why the self-view box was empty. */}
+      {/* Local self-view PiP.
+          - RtcTextureView composites over RtcSurfaceView (no blank-overlay issue).
+          - sourceType must be VideoSourceCamera so Agora binds the camera track. */}
       {phase !== 'error' && camOn && (
         <View style={[styles.pip, { top: insets.top + 12 }]}>
-          <RtcTextureView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+          <RtcTextureView
+            canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
+            style={StyleSheet.absoluteFill}
+          />
           <Text style={styles.pipLabel}>{t('call.you')}</Text>
         </View>
       )}

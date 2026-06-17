@@ -252,7 +252,9 @@ export const createVideoRoom = async (req, res) => {
     const { allowed, doctor } = await resolveAccess(req, appointment);
     if (!allowed) throw new AppError('Unauthorized to join this consultation', 403);
 
-    const provider = String(req.body.provider || env.VIDEO_PROVIDER || 'webrtc').toLowerCase();
+    // Auto-select Agora when it's configured; fall back to webrtc otherwise.
+    const defaultProvider = isAgoraConfigured() ? 'agora' : 'webrtc';
+    const provider = String(req.body.provider || env.VIDEO_PROVIDER || defaultProvider).toLowerCase();
     const callerBaseUrl = callBaseUrlFor(req.userRole);
     const room = provider === 'daily'
         ? await dailyRoom(appointment, appointmentId)

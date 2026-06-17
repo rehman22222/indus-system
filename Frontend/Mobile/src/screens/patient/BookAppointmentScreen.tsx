@@ -46,6 +46,20 @@ function todayIso() {
   return formatDateIso(new Date());
 }
 
+function slotMinutes(start_time: string) {
+  const [h, m] = start_time.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function to12h(start_time: string) {
+  const [hStr, mStr] = start_time.split(':');
+  const h = Number(hStr);
+  const m = mStr?.slice(0, 2) || '00';
+  const suffix = h < 12 ? 'AM' : 'PM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${m} ${suffix}`;
+}
+
 function formatDateIso(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -137,6 +151,19 @@ export function BookAppointmentScreen({ navigation, route }: Props) {
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
+
+  const { amSlots, pmSlots } = useMemo(() => {
+    const today = todayIso();
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const visible = date === today
+      ? slots.filter((s) => slotMinutes(s.start_time) > nowMinutes)
+      : slots;
+    return {
+      amSlots: visible.filter((s) => slotMinutes(s.start_time) < 720),
+      pmSlots: visible.filter((s) => slotMinutes(s.start_time) >= 720),
+    };
+  }, [slots, date]);
 
   const canSubmit = useMemo(
     () => Boolean(user && doctor && slot && date && !submitting),
@@ -450,25 +477,53 @@ export function BookAppointmentScreen({ navigation, route }: Props) {
           <Text style={[styles.label, align]}>{t('book.availableSlot')}</Text>
           {slotsLoading ? (
             <ActivityIndicator color={colors.primary} style={{ alignSelf: 'flex-start', marginVertical: 6 }} />
-          ) : slots.length === 0 ? (
+          ) : amSlots.length === 0 && pmSlots.length === 0 ? (
             <Text style={styles.empty}>{t('book.noSlots')}</Text>
           ) : (
-            <View style={styles.slotGrid}>
-              {slots.map((item) => {
-                const active = slot?.id === item.id;
-                return (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => setSlot(item)}
-                    style={[styles.slotChip, active && styles.slotChipActive]}
-                  >
-                    <Text style={[styles.slotText, active && styles.slotTextActive]}>
-                      {item.start_time.slice(0, 5)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <>
+              {amSlots.length > 0 && (
+                <>
+                  <Text style={styles.slotPeriod}>Morning</Text>
+                  <View style={styles.slotGrid}>
+                    {amSlots.map((item) => {
+                      const active = slot?.id === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => setSlot(item)}
+                          style={[styles.slotChip, active && styles.slotChipActive]}
+                        >
+                          <Text style={[styles.slotText, active && styles.slotTextActive]}>
+                            {to12h(item.start_time)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+              {pmSlots.length > 0 && (
+                <>
+                  <Text style={styles.slotPeriod}>Afternoon / Evening</Text>
+                  <View style={styles.slotGrid}>
+                    {pmSlots.map((item) => {
+                      const active = slot?.id === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => setSlot(item)}
+                          style={[styles.slotChip, active && styles.slotChipActive]}
+                        >
+                          <Text style={[styles.slotText, active && styles.slotTextActive]}>
+                            {to12h(item.start_time)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </>
           )}
 
           {/* Chief complaint */}
@@ -676,6 +731,7 @@ const makeStyles = (colors: ThemeColors) =>
   segmentText: { color: colors.muted, fontWeight: '800' },
   segmentTextActive: { color: colors.primary },
 
+  slotPeriod: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing.sm, marginBottom: 6 },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   slotChip: {
     paddingHorizontal: spacing.md,
